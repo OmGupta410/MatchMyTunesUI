@@ -3,34 +3,23 @@ import { Link } from "react-router-dom";
 
 function Navbar() {
   return (
-    <div className="navbar bg-gray-900 text-white shadow-md p-4 flex justify-between items-center">
-      <div className="text-2xl font-bold">
-        <Link to="/">Match My Tunes</Link>
-      </div>
-
-      {/* Navigation Links */}
-      <nav className="space-x-6">
-        <Link to="/" className="hover:text-gray-400">
+    <header className="flex justify-between items-center px-8 py-4 bg-gray-900 shadow-md text-white">
+      <h1 className="text-2xl font-bold">🎶 Match My Tunes</h1>
+      <nav className="space-x-6 hidden md:flex">
+        <Link to="/" className="hover:text-blue-400">
           Home
         </Link>
-        <Link to="/discover" className="hover:text-gray-400">
-          Discover
+        <Link to="/about" className="hover:text-blue-400">
+          About
         </Link>
-        <Link to="/playlists" className="hover:text-gray-400">
-          Playlists
-        </Link>
-        <Link to="/profile" className="hover:text-gray-400">
-          Profile
+        <Link to="/contact" className="hover:text-blue-400">
+          Contact
         </Link>
       </nav>
-
-      {/* Login/Logout Button */}
-      <div>
-        <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md">
-          Login
-        </button>
-      </div>
-    </div>
+      <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md">
+        <Link to="/login">Login</Link>
+      </button>
+    </header>
   );
 }
 
