@@ -43,9 +43,6 @@ const Home = () => {
               Get Started
             </Button>
           )}
-          <Button variant="outlined" color="primary" href="/about">
-            Learn More
-          </Button>
         </Box>
       </Container>
     </Box>
