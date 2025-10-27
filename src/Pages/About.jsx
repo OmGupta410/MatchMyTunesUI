@@ -1,26 +1,52 @@
-import React from "react";
+import { Box, Container, Typography } from "@mui/material";
 
-const AboutUs = () => {
+const About = () => {
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center px-6 py-16">
-      <h2 className="text-4xl font-bold mb-6">About Us</h2>
-      <p className="text-gray-300 mb-6 max-w-3xl text-center">
-        <strong>Match My Tunes</strong> is a music playlist transfer platform
-        that helps users move their favorite playlists across different music
-        streaming services such as Spotify, YouTube Music, and Gaana.
-      </p>
-      <p className="text-gray-300 mb-6 max-w-3xl text-center">
-        Our mission is to make music management effortless. Whether you switch
-        platforms or want to keep all your favorite songs in one place, we
-        simplify the process and ensure your playlists are ready wherever you
-        go.
-      </p>
-      <p className="text-gray-300 max-w-3xl text-center">
-        Our team is passionate about music and technology, dedicated to creating
-        tools that make your listening experience seamless and enjoyable.
-      </p>
-    </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        color: "text.primary",
+        pt: 8,
+        pb: 6,
+      }}
+    >
+      <Container maxWidth="md">
+        <Typography
+          component="h1"
+          variant="h3"
+          align="center"
+          gutterBottom
+          sx={{ fontWeight: "bold" }}
+        >
+          About Match My Tunes
+        </Typography>
+        <Typography variant="h6" align="justify" paragraph sx={{ mb: 4 }}>
+          Match My Tunes is a unique platform that brings music lovers together.
+          We believe that music is more than just entertainment - it's a way to
+          connect, share experiences, and build meaningful relationships.
+        </Typography>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold" }}>
+          Our Mission
+        </Typography>
+        <Typography variant="body1" paragraph>
+          To create a vibrant community where people can connect through their
+          shared love of music. Whether you're a casual listener or a dedicated
+          audiophile, Match My Tunes helps you find people who share your unique
+          musical taste.
+        </Typography>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold" }}>
+          How It Works
+        </Typography>
+        <Typography variant="body1" paragraph>
+          Simply connect your Spotify account, and our intelligent algorithm
+          will analyze your music preferences. We look at your favorite artists,
+          genres, and listening habits to match you with people who have similar
+          tastes. It's that simple!
+        </Typography>
+      </Container>
+    </Box>
   );
 };
 
-export default AboutUs;
+export default About;

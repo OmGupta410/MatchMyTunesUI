@@ -1,88 +1,126 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import {
+  Box,
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  IconButton,
+  InputAdornment,
+} from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 
-const Signup = () => {
+const SignUp = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
+  const { register } = useAuth();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-    const userExists = users.some((user) => user.email === formData.email);
-
-    if (userExists) {
-      alert("Email already registered. Try logging in.");
-      return;
+    const result = await register(displayName, email, password);
+    if (result.success) {
+      toast.success("Registration successful! Please log in.");
+      navigate("/login");
+    } else {
+      toast.error(result.error);
     }
-
-    users.push(formData);
-    localStorage.setItem("users", JSON.stringify(users));
-    alert("Signup successful! Please login.");
-    navigate("/login");
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center px-4">
-      <div className="bg-gray-900 w-full max-w-md rounded-3xl shadow-2xl p-10">
-        <h2 className="text-3xl font-bold text-white mb-6 text-center">
-          Create Account
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <input
-            type="text"
-            name="name"
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className="w-full p-4 rounded-xl bg-gray-800 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="w-full p-4 rounded-xl bg-gray-800 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            className="w-full p-4 rounded-xl bg-gray-800 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 transition-colors duration-300 text-white font-semibold py-3 rounded-xl shadow-lg"
-          >
-            Sign Up
-          </button>
-        </form>
-        <p className="text-gray-400 mt-6 text-center">
-          Already have an account?{" "}
-          <span
-            className="text-blue-500 hover:underline cursor-pointer"
-            onClick={() => navigate("/login")}
-          >
-            Login
-          </span>
-        </p>
-      </div>
-    </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        bgcolor: "background.default",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Paper
+          elevation={3}
+          sx={{
+            p: 4,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <Typography component="h1" variant="h5" gutterBottom>
+            Sign Up for Match My Tunes
+          </Typography>
+
+          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              label="Display Name"
+              autoFocus
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              label="Email Address"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              helperText="Password must be at least 8 characters long and include numbers and special characters"
+            />
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
+            >
+              {loading ? "Signing up..." : "Sign Up"}
+            </Button>
+            <Button fullWidth variant="text" onClick={() => navigate("/login")}>
+              Already have an account? Login
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    </Box>
   );
 };
 
-export default Signup;
+export default SignUp;
