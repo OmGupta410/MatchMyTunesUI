@@ -1,16 +1,4 @@
-import { useState } from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Divider,
-  IconButton,
-  InputAdornment,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
@@ -39,96 +27,107 @@ const Login = () => {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        bgcolor: "background.default",
-        py: 4,
-      }}
-    >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <Typography component="h1" variant="h5" gutterBottom>
-            Login to Match My Tunes
-          </Typography>
+    <div className="min-h-screen bg-[#040720] flex items-center py-10 px-4">
+      <div className="max-w-4xl mx-auto w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+        <div className="grid md:grid-cols-2">
+          {/* LEFT SIDE - FORM */}
+          <div className="p-8 md:p-10">
+            <h1 className="text-3xl font-bold">Welcome back</h1>
+            <p className="text-gray-400 mt-2">
+              Sign in to keep your playlists synced everywhere.
+            </p>
 
-          <Button
-            variant="contained"
-            fullWidth
-            sx={{ mt: 2, mb: 3 }}
-            onClick={handleSpotifyLogin}
-            style={{ backgroundColor: "#1DB954" }}
-          >
-            Login with Spotify
-          </Button>
-
-          <Divider sx={{ width: "100%", mb: 3 }}>
-            <Typography color="text.secondary">or</Typography>
-          </Divider>
-
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Email Address"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={loading}
+            {/* SPOTIFY LOGIN */}
+            <button
+              onClick={handleSpotifyLogin}
+              className="w-full bg-[#1DB954] text-black font-semibold py-3 rounded-full mt-6 hover:bg-[#17a84c] transition"
             >
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-            <Button
-              fullWidth
-              variant="text"
-              onClick={() => navigate("/signup")}
-            >
-              Don't have an account? Sign Up
-            </Button>
-          </Box>
-        </Paper>
-      </Container>
-    </Box>
+              Login with Spotify
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center my-6">
+              <span className="flex-1 h-px bg-gray-600" />
+              <span className="px-3 text-gray-400 text-sm">or</span>
+              <span className="flex-1 h-px bg-gray-600" />
+            </div>
+
+            {/* FORM */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* EMAIL */}
+              <div>
+                <label className="text-sm text-gray-300">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full mt-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-400"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              {/* PASSWORD */}
+              <div>
+                <label className="text-sm text-gray-300">Password</label>
+                <div className="relative mt-1">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-400"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    className="absolute right-3 top-3 text-gray-300 text-sm"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+
+              {/* LOGIN BUTTON */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-indigo-500 hover:bg-indigo-600 transition py-3 rounded-full font-semibold mt-4"
+              >
+                {loading ? "Logging in..." : "Login"}
+              </button>
+
+              {/* SIGNUP LINK */}
+              <button
+                type="button"
+                onClick={() => navigate("/signup")}
+                className="w-full text-gray-300 text-sm hover:text-white mt-2"
+              >
+                Don't have an account? Sign Up
+              </button>
+            </form>
+          </div>
+
+          {/* RIGHT SIDE - INFO PANEL */}
+          <div className="bg-gradient-to-b from-purple-700/70 to-indigo-900/80 p-8 md:p-10">
+            <h2 className="text-xl font-semibold mb-3">Why MatchMyTunes?</h2>
+
+            <ul className="text-gray-200 space-y-3 text-sm">
+              <li>
+                • Transfer playlists between Spotify, Apple Music, YouTube
+                Music, Deezer, TIDAL, and more.
+              </li>
+              <li>
+                • Sync services automatically so new songs appear everywhere
+                instantly.
+              </li>
+              <li>• Share mixes with friends using different platforms.</li>
+              <li>• Keep your library backed up and safe forever.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

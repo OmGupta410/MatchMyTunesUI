@@ -1,15 +1,4 @@
-import { useState } from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  IconButton,
-  InputAdornment,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
@@ -35,91 +24,112 @@ const SignUp = () => {
     } else {
       toast.error(result.error);
     }
+
     setLoading(false);
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        bgcolor: "background.default",
-        py: 4,
-      }}
-    >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <Typography component="h1" variant="h5" gutterBottom>
-            Sign Up for Match My Tunes
-          </Typography>
+    <div className="min-h-screen bg-[#040720] flex items-center py-10 px-4">
+      <div className="max-w-4xl mx-auto w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Display Name"
-              autoFocus
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Email Address"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              helperText="Password must be at least 8 characters long and include numbers and special characters"
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={loading}
-            >
-              {loading ? "Signing up..." : "Sign Up"}
-            </Button>
-            <Button fullWidth variant="text" onClick={() => navigate("/login")}>
-              Already have an account? Login
-            </Button>
-          </Box>
-        </Paper>
-      </Container>
-    </Box>
+        <div className="grid md:grid-cols-2">
+
+          {/* ================= LEFT SIDE FORM ================= */}
+          <div className="p-8 md:p-10">
+            <h1 className="text-3xl font-bold">Create your account</h1>
+
+            <p className="text-gray-400 mt-2">
+              Build once, listen everywhere. Your playlists deserve a home that moves with you.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+
+              {/* Display Name */}
+              <div>
+                <label className="text-sm text-gray-300">Display Name</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full mt-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-400"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="text-sm text-gray-300">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full mt-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-400"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="text-sm text-gray-300">Password</label>
+
+                <div className="relative mt-1">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white pr-16 focus:outline-none focus:border-indigo-400"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    className="absolute right-3 top-3 text-gray-300 text-sm"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+
+                <p className="text-gray-500 text-xs mt-1">
+                  Password must be at least 8 characters and include numbers + symbols.
+                </p>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-green-500 hover:bg-green-600 transition py-3 rounded-full font-semibold mt-4"
+              >
+                {loading ? "Signing up..." : "Sign Up"}
+              </button>
+
+              {/* Login redirect */}
+              <button
+                type="button"
+                onClick={() => navigate("/login")}
+                className="w-full text-gray-300 text-sm hover:text-white mt-2"
+              >
+                Already have an account? Login
+              </button>
+            </form>
+          </div>
+
+          {/* ================= RIGHT SIDE INFO PANEL ================= */}
+          <div className="bg-gradient-to-b from-green-500/40 to-indigo-700/50 p-8 md:p-10">
+            <h2 className="text-xl font-semibold mb-3">What you get</h2>
+
+            <ul className="text-gray-200 space-y-3 text-sm">
+              <li>• Unlimited transfers between 85+ services like Spotify, Apple Music, YouTube & Deezer.</li>
+              <li>• Smart syncing that remembers ordering, artwork, and hidden gems.</li>
+              <li>• Backups + shareable links to protect every playlist you create.</li>
+            </ul>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
   );
 };
 

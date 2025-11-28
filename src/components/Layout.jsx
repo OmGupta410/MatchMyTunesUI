@@ -10,9 +10,10 @@ import {
   Button,
   MenuItem,
   useTheme,
+  Stack,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -21,6 +22,11 @@ const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
+
+  const navItems = [
+    { label: "Home", path: "/" },
+    { label: "About", path: "/about" },
+  ];
 
   const handleOpenNavMenu = (event) => {
     setAnchorElNav(event.currentTarget);
@@ -36,39 +42,50 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <AppBar position="static">
-        <Container maxWidth="xl">
-          <Toolbar disableGutters>
-            {/* Desktop Logo */}
-            <MusicNoteIcon
-              sx={{ display: { xs: "none", md: "flex" }, mr: 1 }}
-            />
-            <Typography
-              variant="h6"
-              noWrap
-              component="a"
-              href="/"
-              sx={{
-                mr: 2,
-                display: { xs: "none", md: "flex" },
-                fontFamily: "monospace",
-                fontWeight: 700,
-                letterSpacing: ".3rem",
-                color: "inherit",
-                textDecoration: "none",
-              }}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(139,92,246,0.35), transparent 45%), radial-gradient(circle at 80% 0%, rgba(249,115,22,0.25), transparent 35%)",
+      }}
+    >
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          backgroundColor: "rgba(5,11,44,0.75)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          backdropFilter: "blur(22px)",
+        }}
+      >
+        <Container maxWidth="lg">
+          <Toolbar disableGutters sx={{ py: 2 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ cursor: "pointer" }}
+              onClick={() => handleNavigate("/")}
             >
-              MATCH MY TUNES
-            </Typography>
-
-            {/* Mobile Menu */}
-            <Box sx={{ flexGrow: 1, display: { xs: "flex", md: "none" } }}>
-              <IconButton
-                size="large"
-                onClick={handleOpenNavMenu}
-                color="inherit"
+              <GraphicEqIcon sx={{ color: theme.palette.primary.main }} />
+              <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column" }}>
+                <Typography variant="subtitle2" sx={{ letterSpacing: 4 }}>
+                  MATCH MY TUNES
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Playlist bridge for every service
+                </Typography>
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{ display: { xs: "flex", md: "none" }, letterSpacing: 4 }}
               >
+                MMT
+              </Typography>
+            </Stack>
+
+            <Box sx={{ flexGrow: 1, display: { xs: "flex", md: "none" }, justifyContent: "flex-end" }}>
+              <IconButton size="large" onClick={handleOpenNavMenu} color="inherit">
                 <MenuIcon />
               </IconButton>
               <Menu
@@ -76,117 +93,77 @@ const Layout = ({ children }) => {
                 anchorEl={anchorElNav}
                 anchorOrigin={{
                   vertical: "bottom",
-                  horizontal: "left",
+                  horizontal: "right",
                 }}
                 keepMounted
                 transformOrigin={{
                   vertical: "top",
-                  horizontal: "left",
+                  horizontal: "right",
                 }}
                 open={Boolean(anchorElNav)}
                 onClose={handleCloseNavMenu}
-                sx={{
-                  display: { xs: "block", md: "none" },
-                }}
               >
-                <MenuItem onClick={() => handleNavigate("/")}>
-                  <Typography textAlign="center">Home</Typography>
-                </MenuItem>
-                <MenuItem onClick={() => handleNavigate("/about")}>
-                  <Typography textAlign="center">About</Typography>
-                </MenuItem>
-                {!user && (
-                  <>
-                    <MenuItem onClick={() => handleNavigate("/login")}>
-                      <Typography textAlign="center">Login</Typography>
-                    </MenuItem>
-                    <MenuItem onClick={() => handleNavigate("/signup")}>
-                      <Typography textAlign="center">Sign Up</Typography>
-                    </MenuItem>
-                  </>
-                )}
-                {user && (
-                  <MenuItem onClick={logout}>
-                    <Typography textAlign="center">Logout</Typography>
+                {navItems.map((item) => (
+                  <MenuItem key={item.path} onClick={() => handleNavigate(item.path)}>
+                    <Typography textAlign="center">{item.label}</Typography>
                   </MenuItem>
+                ))}
+                {!user ? (
+                  <>
+                    <MenuItem onClick={() => handleNavigate("/login")}>Login</MenuItem>
+                    <MenuItem onClick={() => handleNavigate("/signup")}>Sign Up</MenuItem>
+                  </>
+                ) : (
+                  <MenuItem onClick={logout}>Logout</MenuItem>
                 )}
               </Menu>
             </Box>
 
-            {/* Mobile Logo */}
-            <MusicNoteIcon
-              sx={{ display: { xs: "flex", md: "none" }, mr: 1 }}
-            />
-            <Typography
-              variant="h5"
-              noWrap
-              component="a"
-              href="/"
-              sx={{
-                mr: 2,
-                display: { xs: "flex", md: "none" },
-                flexGrow: 1,
-                fontFamily: "monospace",
-                fontWeight: 700,
-                letterSpacing: ".3rem",
-                color: "inherit",
-                textDecoration: "none",
-              }}
+            <Stack
+              direction="row"
+              spacing={3}
+              sx={{ flexGrow: 1, display: { xs: "none", md: "flex" }, justifyContent: "center" }}
             >
-              MMT
-            </Typography>
+              {navItems.map((item) => (
+                <Button
+                  key={item.path}
+                  onClick={() => handleNavigate(item.path)}
+                  sx={{ color: "white", fontWeight: 500 }}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </Stack>
 
-            {/* Desktop Menu */}
-            <Box sx={{ flexGrow: 1, display: { xs: "none", md: "flex" } }}>
-              <Button
-                onClick={() => handleNavigate("/")}
-                sx={{ my: 2, color: "white", display: "block" }}
-              >
-                Home
-              </Button>
-              <Button
-                onClick={() => handleNavigate("/about")}
-                sx={{ my: 2, color: "white", display: "block" }}
-              >
-                About
-              </Button>
-            </Box>
-
-            {/* Desktop Auth Buttons */}
-            <Box sx={{ display: { xs: "none", md: "flex" } }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
               {!user ? (
                 <>
-                  <Button
-                    onClick={() => handleNavigate("/login")}
-                    sx={{ color: "white" }}
-                  >
+                  <Button variant="text" onClick={() => handleNavigate("/login")} sx={{ color: "#EEF2FF" }}>
                     Login
                   </Button>
                   <Button
-                    onClick={() => handleNavigate("/signup")}
                     variant="contained"
-                    sx={{ ml: 2, bgcolor: theme.palette.primary.light }}
+                    color="primary"
+                    onClick={() => handleNavigate("/signup")}
                   >
-                    Sign Up
+                    Create account
                   </Button>
                 </>
               ) : (
                 <>
-                  <Typography sx={{ mr: 2, alignSelf: "center" }}>
-                    Welcome, {user.displayName}
+                  <Typography variant="body2" color="text.secondary">
+                    Hey, {user.displayName}
                   </Typography>
-                  <Button onClick={logout} sx={{ color: "white" }}>
+                  <Button variant="outlined" color="secondary" onClick={logout}>
                     Logout
                   </Button>
                 </>
               )}
-            </Box>
+            </Stack>
           </Toolbar>
         </Container>
       </AppBar>
-      <Box component="main" sx={{ flexGrow: 1 }}>
-        {children}
-      </Box>
+      <Box component="main">{children}</Box>
     </Box>
   );
 };

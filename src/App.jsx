@@ -13,22 +13,62 @@ const darkTheme = createTheme({
   palette: {
     mode: "dark",
     primary: {
-      main: "#1DB954", // Spotify green
+      main: "#8B5CF6",
+      light: "#A78BFA",
+    },
+    secondary: {
+      main: "#F97316",
     },
     background: {
-      default: "#121212",
-      paper: "#1E1E1E",
+      default: "#050B2C",
+      paper: "rgba(12, 16, 43, 0.85)",
+    },
+    text: {
+      primary: "#F8FAFC",
+      secondary: "#C7D2FE",
     },
   },
+  shape: {
+    borderRadius: 18,
+  },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontWeight: 700,
+    },
+    h2: {
+      fontWeight: 600,
+    },
+    button: {
+      fontWeight: 600,
+    },
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: "#050B2C",
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 999,
           textTransform: "none",
+          paddingLeft: 24,
+          paddingRight: 24,
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: "none",
+          backgroundColor: "rgba(12,16,43,0.85)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 30px 80px rgba(4,7,32,0.45)",
+          backdropFilter: "blur(16px)",
         },
       },
     },
