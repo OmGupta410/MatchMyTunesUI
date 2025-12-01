@@ -5,8 +5,55 @@ const Home = () => {
   // STATE
   // =========================
   const [fromService, setFromService] = useState("Spotify");
-  const [toService, setToService] = useState("YouTube Music");
+  const [toService, setToService] = useState("YouTube");
 
+ // Track connection status
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+
+  // AUTHENTICATION LOGIC
+  // =========================
+  
+  // 1. The function to open the popup
+  const handleLogin = (provider) => {
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    // Backend URL (Replace with your actual Render URL)
+    const apiBaseUrl = "https://matchmytunes.onrender.com"; 
+    const url = `${apiBaseUrl}/api/auth/${provider.toLowerCase()}/login`;
+
+    window.open(
+      url,
+      "MatchMyTunesLogin",
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+  };
+
+  // 2. Listen for the success message from the popup
+  useEffect(() => {
+    const messageHandler = (event) => {
+      if (event.data.type === "AUTH_SUCCESS") {
+        const { token, userId, provider } = event.data;
+        
+        console.log(`Login successful with ${provider}!`);
+        
+        // Save the universal JWT "ID Card"
+        localStorage.setItem("jwt", token);
+        localStorage.setItem("userId", userId);
+
+        // Update state to show "Connected" in the UI
+        if (provider === "Spotify") setSpotifyConnected(true);
+        if (provider === "YouTube") setYoutubeConnected(true);
+      }
+    };
+
+    window.addEventListener("message", messageHandler);
+    return () => window.removeEventListener("message", messageHandler);
+  }, []);
+  
   // SERVICES LIST
   const services = [
     { name: "Spotify", icon: "fa-brands fa-spotify" },
@@ -19,24 +66,38 @@ const Home = () => {
     { name: "SoundCloud", icon: "fa-brands fa-soundcloud" },
   ];
 
-  // WHEN A SERVICE IS CLICKED
-  const handleSelect = (serviceName) => {
-    // If FROM is empty → set FROM
+   // WHEN A SERVICE IS CLICKED
+  const handleSelect = (service) => {
+    const serviceName = service.name;
+    const provider = service.provider;
+
+    // Logic to set From/To
     if (!fromService) {
       setFromService(serviceName);
-      return;
-    }
-
-    // If FROM is selected but TO is empty → set TO
-    if (!toService) {
+    } else if (!toService) {
       setToService(serviceName);
-      return;
+    } else {
+      setFromService(serviceName);
+      setToService("");
     }
 
-    // If both are selected → reset TO, change FROM
-    setFromService(serviceName);
-    setToService("");
+    // Logic to trigger Login Popup
+    if (provider === "Spotify" && !spotifyConnected) {
+        handleLogin("Spotify");
+    }
+    if (provider === "YouTube" && !youtubeConnected) {
+        handleLogin("YouTube");
+    }
   };
+
+  const handleLaunch = () => {
+      if(spotifyConnected && youtubeConnected) {
+          // Redirect to the transfer page where you show playlists
+          navigate('/transfer'); 
+      } else {
+          alert("Please connect both services first!");
+      }
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-white">
