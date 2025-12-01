@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom'; 
 
 const Home = () => {
+  const navigate = useNavigate();
+
   // =========================
- // STATE
+  // STATE
   // =========================
   const [fromService, setFromService] = useState("");
   const [toService, setToService] = useState("");
@@ -11,7 +14,8 @@ const Home = () => {
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
 
- // AUTHENTICATION LOGIC
+  // =========================
+  // AUTHENTICATION LOGIC
   // =========================
   
   // 1. The function to open the popup
@@ -35,6 +39,9 @@ const Home = () => {
   // 2. Listen for the success message from the popup
   useEffect(() => {
     const messageHandler = (event) => {
+      // Security Check: In production, verify event.origin matches your backend URL
+      // if (event.origin !== "https://matchmytunes.onrender.com") return;
+
       if (event.data.type === "AUTH_SUCCESS") {
         const { token, userId, provider } = event.data;
         
@@ -55,10 +62,11 @@ const Home = () => {
   }, []);
 
   // SERVICES LIST
+  // Added 'provider' property to map UI names to backend provider names
   const services = [
     { name: "Spotify", icon: "fa-brands fa-spotify", provider: "Spotify" },
     { name: "Apple", icon: "fa-brands fa-apple" },
-    { name: "YT Music", icon: "fa-brands fa-youtube", provider: "YouTube" }, // Mapped to YouTube
+    { name: "YT Music", icon: "fa-brands fa-youtube", provider: "YouTube" }, 
     { name: "YouTube", icon: "fa-brands fa-youtube", provider: "YouTube" },
     { name: "Deezer", icon: "fa-brands fa-deezer" },
     { name: "TIDAL", icon: "fa-brands fa-tidal" },
@@ -69,9 +77,11 @@ const Home = () => {
   // WHEN A SERVICE IS CLICKED
   const handleSelect = (service) => {
     const serviceName = service.name;
-    const provider = service.provider;
+    // Some services in your list don't have a provider property yet (like Apple), 
+    // so we check if it exists before trying to login.
+    const provider = service.provider; 
 
-    // Logic to set From/To
+    // Logic to set From/To (Visual Selection)
     if (!fromService) {
       setFromService(serviceName);
     } else if (!toService) {
@@ -81,11 +91,11 @@ const Home = () => {
       setToService("");
     }
 
-    // Logic to trigger Login Popup
+    // Logic to trigger Login Popup (Functional Connection)
     if (provider === "Spotify" && !spotifyConnected) {
         handleLogin("Spotify");
     }
-    if (provider === "YouTube" && !youtubeConnected) {
+    else if (provider === "YouTube" && !youtubeConnected) {
         handleLogin("YouTube");
     }
   };
@@ -95,9 +105,10 @@ const Home = () => {
           // Redirect to the transfer page where you show playlists
           navigate('/transfer'); 
       } else {
-          alert("Please connect both services first!");
+          alert("Please connect both services (Spotify and YouTube) first!");
       }
   }
+
   return (
     <div className="min-h-screen bg-[#0b0f19] text-white">
       {/* =========================
@@ -123,12 +134,12 @@ const Home = () => {
 
             {/* BUTTON */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
-              <a
-                href="/signup"
+              <button
+                onClick={handleLaunch}
                 className="bg-green-500 hover:bg-green-600 text-black font-semibold px-6 py-3 rounded-full text-center transition duration-300"
               >
                 Start a transfer
-              </a>
+              </button>
             </div>
 
             {/* STATS */}
@@ -159,7 +170,10 @@ const Home = () => {
 
               <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
                 <p>{fromService || "Select a service"}</p>
-                <span className="text-gray-400 text-xs">Connected</span>
+                {/* DYNAMIC CONNECTION STATUS */}
+                <span className={fromService === "Spotify" && spotifyConnected ? "text-green-400 text-xs font-bold" : "text-gray-400 text-xs"}>
+                   {(fromService === "Spotify" && spotifyConnected) || ((fromService === "YouTube" || fromService === "YT Music") && youtubeConnected) ? "Connected ✅" : "Not Connected"}
+                </span>
               </div>
             </div>
 
@@ -169,8 +183,9 @@ const Home = () => {
 
               <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
                 <p>{toService || "Select a service"}</p>
-                <span className="text-gray-400 text-xs">
-                  {toService ? "Connected" : "Connect"}
+                 {/* DYNAMIC CONNECTION STATUS */}
+                 <span className={toService === "Spotify" && spotifyConnected ? "text-green-400 text-xs font-bold" : "text-gray-400 text-xs"}>
+                   {(toService === "Spotify" && spotifyConnected) || ((toService === "YouTube" || toService === "YT Music") && youtubeConnected) ? "Connected ✅" : "Not Connected"}
                 </span>
               </div>
             </div>
@@ -182,7 +197,7 @@ const Home = () => {
               {services.map((service) => (
                 <div
                   key={service.name}
-                  onClick={() => handleSelect(service.name)}
+                  onClick={() => handleSelect(service)} // Pass the entire service object
                   className={`p-2 border rounded text-center cursor-pointer flex flex-col items-center gap-1 transition duration-300
                     ${
                       fromService === service.name || toService === service.name
@@ -197,17 +212,18 @@ const Home = () => {
               ))}
             </div>
 
-            <button className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold mt-5 py-3 rounded-full transition duration-300">
+            <button 
+                onClick={handleLaunch}
+                className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold mt-5 py-3 rounded-full transition duration-300">
               Launch transfer
             </button>
           </div>
         </div>
       </section>
 
-      {/* =========================
-          HOW IT WORKS
-      ========================== */}
-      <section className="py-16 px-4 border-t border-white/5">
+      {/* ... (Rest of your UI sections: HOW IT WORKS, FEATURES, etc. remain unchanged) ... */}
+      {/* I'm omitting the rest of the static JSX to save space, but keep it in your file! */}
+       <section className="py-16 px-4 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center">How it works</h2>
           <p className="text-gray-400 text-center mt-2 max-w-lg mx-auto">
