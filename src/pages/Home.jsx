@@ -185,35 +185,7 @@ const Home = () => {
 
     window.addEventListener("message", messageHandler);
     return () => window.removeEventListener("message", messageHandler);
-  }, [navigate]);
-
-  // Check for existing auth on mount
-  useEffect(() => {
-    const spotifyConnected = isSpotifyConnected();
-    const youtubeConnected = isYouTubeConnected();
-    
-    setSpotifyConnected(spotifyConnected);
-    setYoutubeConnected(youtubeConnected);
   }, []);
-
-  // Handle disconnect
-  const handleDisconnectSpotify = () => {
-    if (window.confirm('Are you sure you want to disconnect Spotify?')) {
-      disconnectSpotify();
-      setSpotifyConnected(false);
-      if (fromService === "Spotify") setFromService("");
-      toast.success('Spotify disconnected');
-    }
-  };
-
-  const handleDisconnectYouTube = () => {
-    if (window.confirm('Are you sure you want to disconnect YouTube?')) {
-      disconnectYouTube();
-      setYoutubeConnected(false);
-      if (toService === "YouTube" || toService === "YT Music") setToService("");
-      toast.success('YouTube disconnected');
-    }
-  };
 
   // SERVICES LIST
   // Added 'provider' property to map UI names to backend provider names
