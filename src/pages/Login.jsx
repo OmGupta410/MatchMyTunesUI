@@ -10,7 +10,128 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { login, handleSpotifyLogin } = useAuth();
+  const { login } = useAuth();
+  
+  const handleSpotifyLogin = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    // Open popup window for Spotify login
+    const popup = window.open(
+      "https://matchmytunes.onrender.com/api/auth/spotify/login",
+      "MatchMyTunesLogin",
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    if (!popup) {
+      toast.error("Popup blocked. Please allow popups for this site.");
+      return;
+    }
+
+    // Listen for messages from popup
+    const messageHandler = (event) => {
+      const allowedOrigins = [
+        "https://matchmytunes.onrender.com",
+        window.location.origin
+      ];
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        return;
+      }
+
+      if (event.data.type === "AUTH_SUCCESS") {
+        const { token, userId, provider, code } = event.data;
+        
+        if (token) {
+          sessionStorage.setItem("jwt", token);
+          localStorage.setItem("jwt", token);
+          sessionStorage.setItem("spotify_connected", "true");
+          localStorage.setItem("spotify_connected", "true");
+        }
+        
+        window.removeEventListener("message", messageHandler);
+        popup?.close();
+        navigate("/auth/spotify/callback" + (code ? `?code=${code}` : ''));
+      }
+    };
+
+    window.addEventListener("message", messageHandler);
+
+    // Poll popup URL to detect success
+    const checkPopup = setInterval(() => {
+      try {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          window.removeEventListener("message", messageHandler);
+          // Check if auth was successful
+          const token = sessionStorage.getItem("jwt") || localStorage.getItem("jwt");
+          if (token) {
+            sessionStorage.setItem("spotify_connected", "true");
+            localStorage.setItem("spotify_connected", "true");
+            navigate("/auth/spotify/callback");
+          }
+          return;
+        }
+
+        // Try to read popup URL
+        try {
+          const popupUrl = popup.location.href;
+          
+          // Check if URL contains success indicators
+          if (popupUrl.includes('success') || 
+              popupUrl.includes('callback') || 
+              popupUrl.includes('code=') ||
+              popupUrl.includes('token=')) {
+            
+            const urlParams = new URLSearchParams(popup.location.search);
+            const code = urlParams.get('code');
+            const token = urlParams.get('token');
+            
+            if (code || token) {
+              clearInterval(checkPopup);
+              window.removeEventListener("message", messageHandler);
+              
+              if (token) {
+                sessionStorage.setItem("jwt", token);
+                localStorage.setItem("jwt", token);
+              }
+              
+              sessionStorage.setItem("spotify_connected", "true");
+              localStorage.setItem("spotify_connected", "true");
+              popup.close();
+              navigate("/auth/spotify/callback" + (code ? `?code=${code}` : ''));
+            } else if (popupUrl.includes('success') || popupUrl.includes('Authentication Successful')) {
+              // Success page detected
+              clearInterval(checkPopup);
+              window.removeEventListener("message", messageHandler);
+              setTimeout(() => {
+                popup.close();
+                navigate("/auth/spotify/callback");
+              }, 1000);
+            }
+          }
+        } catch (e) {
+          // Cross-origin - continue polling
+        }
+      } catch (e) {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          window.removeEventListener("message", messageHandler);
+        }
+      }
+    }, 500);
+
+    // Cleanup after 5 minutes
+    setTimeout(() => {
+      clearInterval(checkPopup);
+      window.removeEventListener("message", messageHandler);
+      if (!popup.closed) {
+        popup.close();
+      }
+    }, 300000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
