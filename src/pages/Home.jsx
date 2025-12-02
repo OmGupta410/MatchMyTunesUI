@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { disconnectSpotify, disconnectYouTube, isSpotifyConnected, isYouTubeConnected } from '../lib/spotify'; 
+import { useNavigate } from 'react-router-dom'; 
 
 const Home = () => {
   const navigate = useNavigate();
@@ -27,159 +25,35 @@ const Home = () => {
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
 
-    // Backend URL
+    // Backend URL (Replace with your actual Render URL)
     const apiBaseUrl = "https://matchmytunes.onrender.com"; 
     const url = `${apiBaseUrl}/api/auth/${provider.toLowerCase()}/login`;
 
-    // Open popup window
-    const popup = window.open(
+    window.open(
       url,
       "MatchMyTunesLogin",
       `width=${width},height=${height},top=${top},left=${left}`
     );
-
-    if (!popup) {
-      toast.error("Popup blocked. Please allow popups for this site.");
-      return;
-    }
-
-    // Poll popup URL to detect success
-    const checkPopup = setInterval(() => {
-      try {
-        if (popup.closed) {
-          clearInterval(checkPopup);
-          // Check if auth was successful by checking storage
-          const token = sessionStorage.getItem("jwt") || localStorage.getItem("jwt");
-          if (token) {
-            if (provider === "Spotify") {
-              sessionStorage.setItem("spotify_connected", "true");
-              localStorage.setItem("spotify_connected", "true");
-              setSpotifyConnected(true);
-              navigate("/auth/spotify/callback");
-            }
-            if (provider === "YouTube") {
-              sessionStorage.setItem("youtube_connected", "true");
-              localStorage.setItem("youtube_connected", "true");
-              setYoutubeConnected(true);
-            }
-          }
-          return;
-        }
-
-        // Try to read popup URL (will fail if cross-origin, that's okay)
-        try {
-          const popupUrl = popup.location.href;
-          
-          // Check if URL contains success indicators
-          if (popupUrl.includes('success') || 
-              popupUrl.includes('callback') || 
-              popupUrl.includes('code=') ||
-              popupUrl.includes('token=')) {
-            
-            // Extract code or token from URL
-            const urlParams = new URLSearchParams(popup.location.search);
-            const code = urlParams.get('code');
-            const token = urlParams.get('token');
-            
-            if (code || token) {
-              clearInterval(checkPopup);
-              
-              // Store token if available
-              if (token) {
-                sessionStorage.setItem("jwt", token);
-                localStorage.setItem("jwt", token);
-              }
-              
-              // Mark as connected
-              if (provider === "Spotify") {
-                sessionStorage.setItem("spotify_connected", "true");
-                localStorage.setItem("spotify_connected", "true");
-                setSpotifyConnected(true);
-                popup.close();
-                navigate("/auth/spotify/callback" + (code ? `?code=${code}` : ''));
-              }
-              if (provider === "YouTube") {
-                sessionStorage.setItem("youtube_connected", "true");
-                localStorage.setItem("youtube_connected", "true");
-                setYoutubeConnected(true);
-                popup.close();
-              }
-            } else if (popupUrl.includes('success') || popupUrl.includes('Authentication Successful')) {
-              // Success page detected, close popup and check for token
-              clearInterval(checkPopup);
-              setTimeout(() => {
-                popup.close();
-                // Try to fetch token from backend or check storage
-                if (provider === "Spotify") {
-                  navigate("/auth/spotify/callback");
-                }
-              }, 1000);
-            }
-          }
-        } catch (e) {
-          // Cross-origin error - can't read URL, that's normal
-          // Continue polling
-        }
-      } catch (e) {
-        // Popup might be closed or inaccessible
-        if (popup.closed) {
-          clearInterval(checkPopup);
-        }
-      }
-    }, 500);
-
-    // Cleanup after 5 minutes
-    setTimeout(() => {
-      clearInterval(checkPopup);
-      if (!popup.closed) {
-        popup.close();
-      }
-    }, 300000);
   };
 
   // 2. Listen for the success message from the popup
   useEffect(() => {
     const messageHandler = (event) => {
       // Security Check: In production, verify event.origin matches your backend URL
-      // For now, we'll accept messages from the backend domain
-      const allowedOrigins = [
-        "https://matchmytunes.onrender.com",
-        window.location.origin
-      ];
-      
-      if (!allowedOrigins.includes(event.origin)) {
-        console.warn("Message from unauthorized origin:", event.origin);
-        return;
-      }
+      // if (event.origin !== "https://matchmytunes.onrender.com") return;
 
       if (event.data.type === "AUTH_SUCCESS") {
         const { token, userId, provider } = event.data;
         
         console.log(`Login successful with ${provider}!`);
         
-        // Save the universal JWT "ID Card" in both sessionStorage and localStorage
-        if (token) {
-          sessionStorage.setItem("jwt", token);
-          localStorage.setItem("jwt", token);
-        }
-        if (userId) {
-          sessionStorage.setItem("userId", userId);
-          localStorage.setItem("userId", userId);
-        }
+        // Save the universal JWT "ID Card"
+        localStorage.setItem("jwt", token);
+        localStorage.setItem("userId", userId);
 
         // Update state to show "Connected" in the UI
-        if (provider === "Spotify" || provider === "spotify") {
-          sessionStorage.setItem("spotify_connected", "true");
-          localStorage.setItem("spotify_connected", "true");
-          setSpotifyConnected(true);
-          // Redirect to callback page to load playlists
-          navigate("/auth/spotify/callback");
-        }
-        if (provider === "YouTube" || provider === "youtube") {
-          sessionStorage.setItem("youtube_connected", "true");
-          localStorage.setItem("youtube_connected", "true");
-          setYoutubeConnected(true);
-        }
+        if (provider === "Spotify") setSpotifyConnected(true);
+        if (provider === "YouTube") setYoutubeConnected(true);
       }
     };
 
@@ -227,26 +101,11 @@ const Home = () => {
   };
 
   const handleLaunch = () => {
-      // Check if Spotify is connected
-      if (!spotifyConnected) {
-          toast.error("Please connect Spotify first!");
-          return;
-      }
-
-      // If both services are selected and connected, go directly to playlist selection
-      // Then user can proceed to transfer setup (which will already have destination set)
-      if (fromService && toService && spotifyConnected && 
-          ((toService === "YouTube" || toService === "YT Music") && youtubeConnected)) {
-          // Both selected and connected - go to playlist selection
-          navigate('/auth/spotify/callback');
-      } else if (fromService && toService && !youtubeConnected && 
-                 (toService === "YouTube" || toService === "YT Music")) {
-          // YouTube selected but not connected
-          toast.error("Please connect YouTube first!");
-          handleLogin("YouTube");
+      if(spotifyConnected && youtubeConnected) {
+          // Redirect to the transfer page where you show playlists
+          navigate('/transfer'); 
       } else {
-          // Just go to playlist selection
-          navigate('/auth/spotify/callback');
+          alert("Please connect both services (Spotify and YouTube) first!");
       }
   }
 
@@ -307,21 +166,7 @@ const Home = () => {
 
             {/* FROM SERVICE */}
             <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-gray-400">FROM SERVICE</p>
-                {fromService === "Spotify" && spotifyConnected && (
-                  <button
-                    onClick={handleDisconnectSpotify}
-                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
-                    title="Disconnect Spotify"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Disconnect
-                  </button>
-                )}
-              </div>
+              <p className="text-xs text-gray-400">FROM SERVICE</p>
 
               <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
                 <p>{fromService || "Select a service"}</p>
@@ -334,21 +179,7 @@ const Home = () => {
 
             {/* TO SERVICE */}
             <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-gray-400">TO SERVICE</p>
-                {((toService === "YouTube" || toService === "YT Music") && youtubeConnected) && (
-                  <button
-                    onClick={handleDisconnectYouTube}
-                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
-                    title="Disconnect YouTube"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Disconnect
-                  </button>
-                )}
-              </div>
+              <p className="text-xs text-gray-400">TO SERVICE</p>
 
               <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
                 <p>{toService || "Select a service"}</p>

@@ -29,19 +29,21 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#040720] flex items-center">
+    <div className="min-h-screen bg-[#040720] flex items-center py-10 px-4">
       <div className="max-w-4xl mx-auto w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+
         <div className="grid md:grid-cols-2">
+
           {/* ================= LEFT SIDE FORM ================= */}
           <div className="p-8 md:p-10">
             <h1 className="text-3xl font-bold">Create your account</h1>
 
             <p className="text-gray-400 mt-2">
-              Build once, listen everywhere. Your playlists deserve a home that
-              moves with you.
+              Build once, listen everywhere. Your playlists deserve a home that moves with you.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+
               {/* Display Name */}
               <div>
                 <label className="text-sm text-gray-300">Display Name</label>
@@ -89,8 +91,7 @@ const SignUp = () => {
                 </div>
 
                 <p className="text-gray-500 text-xs mt-1">
-                  Password must be at least 8 characters and include numbers +
-                  symbols.
+                  Password must be at least 8 characters and include numbers + symbols.
                 </p>
               </div>
 
@@ -119,21 +120,14 @@ const SignUp = () => {
             <h2 className="text-xl font-semibold mb-3">What you get</h2>
 
             <ul className="text-gray-200 space-y-3 text-sm">
-              <li>
-                • Unlimited transfers between 85+ services like Spotify, Apple
-                Music, YouTube & Deezer.
-              </li>
-              <li>
-                • Smart syncing that remembers ordering, artwork, and hidden
-                gems.
-              </li>
-              <li>
-                • Backups + shareable links to protect every playlist you
-                create.
-              </li>
+              <li>• Unlimited transfers between 85+ services like Spotify, Apple Music, YouTube & Deezer.</li>
+              <li>• Smart syncing that remembers ordering, artwork, and hidden gems.</li>
+              <li>• Backups + shareable links to protect every playlist you create.</li>
             </ul>
           </div>
+
         </div>
+
       </div>
     </div>
   );
