@@ -8,6 +8,8 @@ import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import SpotifyCallback from "./pages/auth/spotify/callback";
+import TransferSetup from "./pages/transfer/setup";
 
 const darkTheme = createTheme({
   palette: {
@@ -81,14 +83,14 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-            </Routes>
-          </Layout>
+          <Routes>
+            <Route path="/" element={<Layout><Home /></Layout>} />
+            <Route path="/about" element={<Layout><About /></Layout>} />
+            <Route path="/login" element={<Layout><Login /></Layout>} />
+            <Route path="/signup" element={<Layout><SignUp /></Layout>} />
+            <Route path="/auth/spotify/callback" element={<SpotifyCallback />} />
+            <Route path="/transfer/setup" element={<TransferSetup />} />
+          </Routes>
         </Router>
         <Toaster
           position="top-center"
