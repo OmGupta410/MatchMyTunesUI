@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import SpotifyCallback from "./pages/auth/spotify/callback";
 import TransferSetup from "./pages/transfer/setup";
+import TransferProgress from "./pages/transfer/progress";
+import Plans from "./pages/Plans";
 
 const darkTheme = createTheme({
   palette: {
@@ -84,12 +86,16 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<Layout><Home /></Layout>} />
-            <Route path="/about" element={<Layout><About /></Layout>} />
-            <Route path="/login" element={<Layout><Login /></Layout>} />
-            <Route path="/signup" element={<Layout><SignUp /></Layout>} />
-            <Route path="/auth/spotify/callback" element={<SpotifyCallback />} />
-            <Route path="/transfer/setup" element={<TransferSetup />} />
+            <Route element={<Layout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/plans" element={<Plans />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/auth/spotify/callback" element={<SpotifyCallback />} />
+              <Route path="/transfer/setup" element={<TransferSetup />} />
+              <Route path="/transfer/progress" element={<TransferProgress />} />
+            </Route>
           </Routes>
         </Router>
         <Toaster
