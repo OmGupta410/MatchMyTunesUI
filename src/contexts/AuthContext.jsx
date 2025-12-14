@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
+import {
+  authApi,
+  getStoredToken,
+  persistToken,
+  removeStoredToken,
+} from "../lib/api.js";
 
 const AuthContext = createContext();
 
@@ -10,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getStoredToken();
     const userData = localStorage.getItem("user");
     if (token && userData) {
       setUser(JSON.parse(userData));
@@ -20,55 +25,43 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post(
-        "https://matchmytunes.onrender.com/api/account/login",
-        {
-          email,
-          password,
-        }
-      );
-      const { token, userId, displayName } = response.data;
+      const { token, userId, displayName } = await authApi.login({
+        email,
+        password,
+      });
       const userData = { userId, displayName };
-      localStorage.setItem("token", token);
+      persistToken(token);
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.message || "Login failed",
+        error: error?.message || "Login failed",
       };
     }
   };
 
   const register = async (displayName, email, password) => {
     try {
-      await axios.post(
-        "https://matchmytunes.onrender.com/api/account/register",
-        {
-          displayName,
-          email,
-          password,
-        }
-      );
+      await authApi.register({ displayName, email, password });
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.message || "Registration failed",
+        error: error?.message || "Registration failed",
       };
     }
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
+    removeStoredToken();
     setUser(null);
   };
 
   const handleSpotifyLogin = () => {
-    window.location.href =
-      "https://matchmytunes.onrender.com/api/auth/spotify/login";
+    window.location.href = authApi.spotifyLoginUrl();
   };
 
   const value = {
