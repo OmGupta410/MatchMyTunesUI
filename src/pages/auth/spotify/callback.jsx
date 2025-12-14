@@ -170,22 +170,52 @@ const SpotifyCallback = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { sourceService, setSourceService, selectedPlaylists } = useSelectionStore();
-  const sourceProvider = sourceService?.includes("youtube") ? "youtube" : "spotify";
-  const providerLabel = providerLabels[sourceProvider];
+  const rawSourceParam = (searchParams.get("source") || "").toLowerCase();
+  const normalizedSourceFromParam = rawSourceParam.includes("youtube")
+    ? "youtube"
+    : rawSourceParam.includes("spotify")
+    ? "spotify"
+    : "";
+  const effectiveSourceService = sourceService || normalizedSourceFromParam;
+  const sourceProvider = effectiveSourceService?.includes("youtube")
+    ? "youtube"
+    : effectiveSourceService?.includes("spotify")
+    ? "spotify"
+    : "";
+  const providerLabel = providerLabels[sourceProvider] || "Spotify";
 
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(fallbackProfiles[sourceProvider]);
+  const [profile, setProfile] = useState(
+    fallbackProfiles[sourceProvider] || fallbackProfiles.spotify
+  );
   const [playlists, setPlaylists] = useState([]);
   const [favoriteCounts, setFavoriteCounts] = useState({ songs: 0, albums: 0, artists: 0 });
 
   useEffect(() => {
-    setProfile(fallbackProfiles[sourceProvider]);
+    if (normalizedSourceFromParam && normalizedSourceFromParam !== sourceService) {
+      setSourceService(normalizedSourceFromParam);
+    }
+  }, [normalizedSourceFromParam, setSourceService, sourceService]);
+
+  useEffect(() => {
+    if (!sourceProvider) {
+      toast.error("Select a source service first.");
+      navigate("/");
+    }
+  }, [navigate, sourceProvider]);
+
+  useEffect(() => {
+    setProfile(fallbackProfiles[sourceProvider] || fallbackProfiles.spotify);
   }, [sourceProvider]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
+        if (!sourceProvider) {
+          return;
+        }
+
         const code = searchParams.get("code");
         const state = searchParams.get("state");
 
@@ -214,7 +244,7 @@ const SpotifyCallback = () => {
         } else {
           if (!isYouTubeConnected() && !token) {
             toast.error("Connect YouTube to continue.");
-            setSourceService("spotify");
+            setSourceService(null);
             navigate("/");
             return;
           }
@@ -287,10 +317,10 @@ const SpotifyCallback = () => {
 
     if (sourceProvider === "spotify") {
       disconnectSpotify();
-      setSourceService("spotify");
+      setSourceService(null);
     } else {
       disconnectYouTube();
-      setSourceService("spotify");
+      setSourceService(null);
     }
     toast.success(`${providerLabel} disconnected.`);
     navigate("/");
