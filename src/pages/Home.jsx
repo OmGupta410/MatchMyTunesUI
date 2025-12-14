@@ -64,17 +64,12 @@ const initialCardState = {
 
 const Home = () => {
   const navigate = useNavigate();
-  const {
-    sourceService,
-    clearSelection,
-    setDestinationService: setStoreDestination,
-    setSourceService: setStoreSource,
-  } = useSelectionStore((state) => ({
-    sourceService: state.sourceService,
-    clearSelection: state.clearSelection,
-    setDestinationService: state.setDestinationService,
-    setSourceService: state.setSourceService,
-  }));
+  const sourceService = useSelectionStore((state) => state.sourceService);
+  const clearSelection = useSelectionStore((state) => state.clearSelection);
+  const setDestinationService = useSelectionStore(
+    (state) => state.setDestinationService
+  );
+  const setSourceService = useSelectionStore((state) => state.setSourceService);
   const [connections, setConnections] = useState({
     spotify: false,
     youtube: false,
@@ -184,8 +179,8 @@ const Home = () => {
   }, [updateConnections]);
 
   useEffect(() => {
-    setStoreDestination(null);
-  }, [setStoreDestination]);
+    setDestinationService(null);
+  }, [setDestinationService]);
 
   useEffect(() => {
     const listener = (event) => {
@@ -318,10 +313,10 @@ const Home = () => {
     }
 
     if (resolveProviderKey(sourceService) === provider) {
-      setStoreSource(null);
+      setSourceService(null);
     }
 
-    setStoreDestination(null);
+    setDestinationService(null);
     clearSelection();
     setPendingNavigation(false);
     updateConnections();
@@ -332,9 +327,9 @@ const Home = () => {
       return;
     }
 
-    setStoreSource(serviceId);
+    setSourceService(serviceId);
     setPendingNavigation(false);
-    setStoreDestination(null);
+    setDestinationService(null);
     clearSelection();
 
     const selectedOption = SOURCE_OPTIONS.find((option) => option.id === serviceId);
