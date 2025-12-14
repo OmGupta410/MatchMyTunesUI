@@ -306,6 +306,11 @@ const TransferSetup = () => {
     const provider = mapServiceToProvider(service.id);
     const currentSourceProvider = mapServiceToProvider(sourceService);
 
+    if (!currentSourceProvider) {
+      toast.error("Pick a source playlist before choosing a destination.");
+      return;
+    }
+
     if (provider && provider === currentSourceProvider) {
       toast.error("Pick a different destination provider to continue.");
       return;
@@ -322,7 +327,7 @@ const TransferSetup = () => {
     }
   };
 
-  const sourceProvider = mapServiceToProvider(sourceService) || "spotify";
+  const sourceProvider = mapServiceToProvider(sourceService);
   const destinationProvider = mapServiceToProvider(localDestination);
   const comboSupported = Boolean(
     sourceProvider &&
@@ -333,7 +338,20 @@ const TransferSetup = () => {
 
   const destinationLabel = services.find((service) => service.id === localDestination)?.name;
 
+  useEffect(() => {
+    if (!sourceProvider) {
+      toast.error("Select a source service first.");
+      navigate("/");
+    }
+  }, [navigate, sourceProvider]);
+
   const handleStartTransfer = () => {
+    if (!sourceProvider) {
+      toast.error("Select a source before starting a transfer.");
+      navigate("/");
+      return;
+    }
+
     if (!localDestination) {
       toast.error("Select a destination before continuing.");
       return;
@@ -459,21 +477,6 @@ const TransferSetup = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#050B2C] via-[#1c1f54] to-[#040720] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="sticky top-6 z-40 flex justify-end">
-          <button
-            type="button"
-            onClick={handleStartTransfer}
-            disabled={!comboSupported || !selectedPlaylists.length || isStarting}
-            className={`px-6 py-3 rounded-full font-semibold transition-all ${
-              !comboSupported || !selectedPlaylists.length || isStarting
-                ? "bg-gray-600 text-gray-300 cursor-not-allowed opacity-70"
-                : "bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/40"
-            }`}
-          >
-            {isStarting ? "Starting..." : "Start transfer"}
-          </button>
-        </div>
-
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6">
           <h1 className="text-2xl font-semibold text-white">Review your transfer</h1>
           <div className="grid gap-4 sm:grid-cols-2 mt-6 text-sm text-gray-300">
@@ -529,6 +532,18 @@ const TransferSetup = () => {
           <p className="text-xs text-gray-400 mt-4">
             Only Spotify ↔ YouTube routes are supported right now. Other services will be available soon.
           </p>
+          <button
+            type="button"
+            onClick={handleStartTransfer}
+            disabled={!comboSupported || !selectedPlaylists.length || isStarting}
+            className={`mt-6 w-full rounded-full py-3 font-semibold transition-all ${
+              !comboSupported || !selectedPlaylists.length || isStarting
+                ? "bg-gray-600 text-gray-300 cursor-not-allowed opacity-70"
+                : "bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/40"
+            }`}
+          >
+            {isStarting ? "Starting..." : "Start transfer"}
+          </button>
         </div>
       </div>
 

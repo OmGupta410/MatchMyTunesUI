@@ -43,6 +43,10 @@ const SERVICE_OPTIONS = [
   },
 ];
 
+const SOURCE_OPTIONS = SERVICE_OPTIONS.filter((option) =>
+  ["spotify", "youtube"].includes(option.id)
+);
+
 const PROVIDER_LABELS = {
   spotify: "Spotify",
   youtube: "YouTube",
@@ -61,13 +65,16 @@ const initialCardState = {
 const Home = () => {
   const navigate = useNavigate();
   const {
+    sourceService,
     clearSelection,
     setDestinationService: setStoreDestination,
     setSourceService: setStoreSource,
-  } = useSelectionStore();
-  const [sourceService, setSourceService] = useState("spotify");
-  const [destinationService, setDestinationServiceState] =
-    useState("youtube-music");
+  } = useSelectionStore((state) => ({
+    sourceService: state.sourceService,
+    clearSelection: state.clearSelection,
+    setDestinationService: state.setDestinationService,
+    setSourceService: state.setSourceService,
+  }));
   const [connections, setConnections] = useState({
     spotify: false,
     youtube: false,
@@ -76,7 +83,7 @@ const Home = () => {
   const [lastTransfer, setLastTransfer] = useState(initialCardState);
   const [lastTransferLoading, setLastTransferLoading] = useState(false);
   const [lastTransferError, setLastTransferError] = useState("");
-  const [shouldNavigateAfterAuth, setShouldNavigateAfterAuth] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(false);
   const pollingRef = useRef(null);
   const lastTransferTimestamp = useMemo(() => {
     if (!lastTransfer.updatedAt) {
@@ -103,7 +110,29 @@ const Home = () => {
   }, []);
 
   const sourceProviderValue = resolveProviderKey(sourceService);
-  const destinationProviderValue = resolveProviderKey(destinationService);
+
+  const navigateToPlaylists = useCallback(() => {
+    if (!sourceProviderValue) {
+      toast.error("Select a source platform first.");
+      return;
+    }
+
+    clearSelection();
+    setPendingNavigation(false);
+    const target = encodeURIComponent(sourceProviderValue);
+    navigate(`/auth/spotify/callback?source=${target}`);
+  }, [clearSelection, navigate, sourceProviderValue]);
+
+  const canProceedToPlaylists =
+    sourceProviderValue === "spotify"
+      ? connections.spotify
+      : sourceProviderValue === "youtube"
+      ? connections.youtube
+      : false;
+
+  const connectedProvidersList = CONNECTED_PROVIDERS.filter(
+    (provider) => connections[provider]
+  );
 
   const updateConnections = useCallback(() => {
     setConnections({
@@ -155,12 +184,8 @@ const Home = () => {
   }, [updateConnections]);
 
   useEffect(() => {
-    setStoreDestination(destinationService || null);
-  }, [destinationService, setStoreDestination]);
-
-  useEffect(() => {
-    setStoreSource(sourceService || "spotify");
-  }, [setStoreSource, sourceService]);
+    setStoreDestination(null);
+  }, [setStoreDestination]);
 
   useEffect(() => {
     const listener = (event) => {
@@ -169,60 +194,43 @@ const Home = () => {
         return;
       }
 
-      if (event.data?.type === "AUTH_SUCCESS") {
-        updateConnections();
-        const provider = (event.data?.provider || "").toLowerCase();
-        if (provider === "spotify") {
-          setSpotifyConnected(true);
-          setStoreSource("spotify");
-        }
-        if (provider === "youtube") {
-          setYouTubeConnected(true);
-        }
+      if (event.data?.type !== "AUTH_SUCCESS") {
+        return;
+      }
 
-        if (shouldNavigateAfterAuth) {
-          const sourceProvider = resolveProviderKey(sourceService);
-          const destinationProvider = resolveProviderKey(destinationService);
-          const requiredProviders = Array.from(
-            new Set(
-              [sourceProvider, destinationProvider].filter(
-                (providerKey) =>
-                  providerKey && CONNECTED_PROVIDERS.includes(providerKey)
-              )
-            )
-          );
+      updateConnections();
+      const provider = (event.data?.provider || "").toLowerCase();
 
-          const allConnected = requiredProviders.every((providerKey) => {
-            if (providerKey === "spotify") {
-              return isSpotifyConnected();
-            }
-            if (providerKey === "youtube") {
-              return isYouTubeConnected();
-            }
-            return true;
-          });
+      if (provider === "spotify") {
+        setSpotifyConnected(true);
+      }
+      if (provider === "youtube") {
+        setYouTubeConnected(true);
+      }
 
-          if (allConnected) {
-            setShouldNavigateAfterAuth(false);
-            clearSelection();
-            navigate("/auth/spotify/callback");
-          }
-        }
+      if (!pendingNavigation) {
+        return;
+      }
+
+      if (!provider || provider !== sourceProviderValue) {
+        return;
+      }
+
+      const providerConnected =
+        provider === "spotify"
+          ? isSpotifyConnected()
+          : provider === "youtube"
+          ? isYouTubeConnected()
+          : false;
+
+      if (providerConnected) {
+        navigateToPlaylists();
       }
     };
 
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
-  }, [
-    navigate,
-    updateConnections,
-    shouldNavigateAfterAuth,
-    resolveProviderKey,
-    sourceService,
-    destinationService,
-    clearSelection,
-    setStoreSource,
-  ]);
+  }, [navigateToPlaylists, pendingNavigation, sourceProviderValue, updateConnections]);
 
   const fetchLastTransfer = useCallback(async () => {
     setLastTransferLoading(true);
@@ -302,38 +310,34 @@ const Home = () => {
     if (provider === "spotify") {
       disconnectSpotify();
       toast.success("Spotify disconnected");
-      setSourceService("spotify");
-      setStoreSource("spotify");
     }
 
     if (provider === "youtube") {
       disconnectYouTube();
       toast.success("YouTube disconnected");
-      if (sourceService?.includes("youtube")) {
-        setSourceService("spotify");
-        setStoreSource("spotify");
-      }
-      if (destinationService?.includes("youtube")) {
-        setDestinationServiceState("");
-        setStoreDestination(null);
-      }
     }
 
+    if (resolveProviderKey(sourceService) === provider) {
+      setStoreSource(null);
+    }
+
+    setStoreDestination(null);
+    clearSelection();
+    setPendingNavigation(false);
     updateConnections();
   };
 
-  const handleServicePick = (slot, serviceId) => {
-    if (slot === "from") {
-      setSourceService(serviceId);
-      setStoreSource(serviceId);
-    } else {
-      setDestinationServiceState(serviceId);
-      setStoreDestination(serviceId);
+  const handleSourcePick = (serviceId) => {
+    if (!serviceId) {
+      return;
     }
 
-    const selectedOption = SERVICE_OPTIONS.find(
-      (option) => option.id === serviceId
-    );
+    setStoreSource(serviceId);
+    setPendingNavigation(false);
+    setStoreDestination(null);
+    clearSelection();
+
+    const selectedOption = SOURCE_OPTIONS.find((option) => option.id === serviceId);
     if (
       selectedOption?.supportsConnect &&
       CONNECTED_PROVIDERS.includes(selectedOption.provider)
@@ -349,53 +353,33 @@ const Home = () => {
   };
 
   const handleGoToPlaylists = () => {
-    setShouldNavigateAfterAuth(false);
-    if (!sourceService || !destinationService) {
-      toast.error("Choose both source and destination first.");
+    if (!sourceService) {
+      toast.error("Select a source platform first.");
       return;
     }
 
-    if (sourceService === destinationService) {
-      toast.error("Pick two different services for transfer.");
+    const provider = resolveProviderKey(sourceService);
+    if (!provider) {
+      toast.error("This source is not supported yet.");
       return;
     }
 
-    const sourceProvider = resolveProviderKey(sourceService);
-    const destinationProvider = resolveProviderKey(destinationService);
-    const comboSupported = Boolean(
-      sourceProvider &&
-        destinationProvider &&
-        sourceProvider !== destinationProvider
-    );
-    if (!comboSupported) {
-      toast.error("This transfer path is not supported yet.");
-      return;
-    }
-
-    const needsSpotify =
-      sourceProvider === "spotify" || destinationProvider === "spotify";
-    if (needsSpotify && !connections.spotify) {
+    if (provider === "spotify" && !connections.spotify) {
       toast.error("Connect your Spotify account to continue.");
+      setPendingNavigation(true);
       openAuthWindow("spotify");
-      setShouldNavigateAfterAuth(true);
       return;
     }
 
-    const needsYouTube =
-      sourceProvider === "youtube" || destinationProvider === "youtube";
-    if (needsYouTube && !connections.youtube) {
+    if (provider === "youtube" && !connections.youtube) {
       toast.error("Connect your YouTube account to continue.");
+      setPendingNavigation(true);
       openAuthWindow("youtube");
-      setShouldNavigateAfterAuth(true);
       return;
     }
 
-    clearSelection();
-    setShouldNavigateAfterAuth(false);
-    navigate("/auth/spotify/callback");
+    navigateToPlaylists();
   };
-
-  const quickSetupOptions = useMemo(() => SERVICE_OPTIONS, []);
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-white">
@@ -471,50 +455,42 @@ const Home = () => {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {Array.from(
-                new Set(
-                  [sourceProviderValue, destinationProviderValue].filter(
-                    (provider) =>
-                      provider && CONNECTED_PROVIDERS.includes(provider)
-                  )
-                )
-              ).map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  onClick={() => handleDisconnect(provider)}
-                  disabled={!connections[provider]}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    connections[provider]
-                      ? "border-red-400 text-red-300 hover:bg-red-400/10"
-                      : "border-gray-600 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  Disconnect {PROVIDER_LABELS[provider]}
-                </button>
-              ))}
+              {connectedProvidersList.length ? (
+                connectedProvidersList.map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() => handleDisconnect(provider)}
+                    className="px-3 py-1.5 rounded-full text-xs border border-red-400 text-red-300 hover:bg-red-400/10 transition"
+                  >
+                    Disconnect {PROVIDER_LABELS[provider]}
+                  </button>
+                ))
+              ) : (
+                <span className="text-xs text-gray-500">
+                  Connect a service to manage connections here.
+                </span>
+              )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 mt-4">
-              {[
-                { slot: "from", value: sourceService, label: "Source" },
-                { slot: "to", value: destinationService, label: "Destination" },
-              ].map((group) => (
-                <div
-                  key={group.slot}
-                  className="relative border border-white/10 rounded-lg p-4"
-                >
-                  <span className="absolute -top-3 left-4 bg-[#0b0f19] border border-white/10 text-[11px] uppercase tracking-widest px-2 py-0.5 text-gray-400 rounded-full">
-                    {group.label}
-                  </span>
-                  <div className="grid grid-cols-2 gap-3">
-                    {quickSetupOptions.map((option) => (
+            <div className="grid gap-4 mt-4">
+              <div className="relative border border-white/10 rounded-lg p-4">
+                <span className="absolute -top-3 left-4 bg-[#0b0f19] border border-white/10 text-[11px] uppercase tracking-widest px-2 py-0.5 text-gray-400 rounded-full">
+                  Step 1 · Source
+                </span>
+                <p className="text-xs text-gray-400 mb-3">
+                  Pick where your playlists currently live.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {SOURCE_OPTIONS.map((option) => {
+                    const isSelected = sourceService === option.id;
+                    return (
                       <button
                         type="button"
-                        key={`${group.slot}-${option.id}`}
-                        onClick={() => handleServicePick(group.slot, option.id)}
+                        key={option.id}
+                        onClick={() => handleSourcePick(option.id)}
                         className={`flex flex-col items-center justify-center gap-2 rounded-xl p-4 border transition ${
-                          group.value === option.id
+                          isSelected
                             ? "border-purple-400 bg-purple-500/10"
                             : "border-white/10 hover:border-purple-300/50"
                         } ${option.supportsConnect ? "" : "opacity-70"}`}
@@ -524,10 +500,60 @@ const Home = () => {
                           {option.label}
                         </span>
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              <div className="relative border border-white/10 rounded-lg p-4">
+                <span className="absolute -top-3 left-4 bg-[#0b0f19] border border-white/10 text-[11px] uppercase tracking-widest px-2 py-0.5 text-gray-400 rounded-full">
+                  Step 2 · Playlists
+                </span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-200">
+                      {sourceProviderValue
+                        ? `Connect ${PROVIDER_LABELS[sourceProviderValue]}`
+                        : "Pick a source above"}
+                    </p>
+                    {sourceProviderValue ? (
+                      <span
+                        className={`text-xs ${
+                          canProceedToPlaylists ? "text-green-300" : "text-orange-300"
+                        }`}
+                      >
+                        {canProceedToPlaylists ? "Ready" : "Needs connection"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Authenticate and load playlists from your source platform.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGoToPlaylists}
+                    disabled={!sourceProviderValue}
+                    className={`w-full px-4 py-2 rounded-full text-sm font-semibold transition ${
+                      !sourceProviderValue
+                        ? "bg-gray-700 text-gray-400 cursor-not-allowed opacity-70"
+                        : canProceedToPlaylists
+                        ? "bg-green-500 hover:bg-green-600 text-white"
+                        : "bg-purple-500/30 text-purple-200 border border-purple-400/40 hover:border-purple-200"
+                    }`}
+                  >
+                    View playlists
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative border border-dashed border-white/10 rounded-lg p-4">
+                <span className="absolute -top-3 left-4 bg-[#0b0f19] border border-white/10 text-[11px] uppercase tracking-widest px-2 py-0.5 text-gray-400 rounded-full">
+                  Step 3 · Destination
+                </span>
+                <p className="text-xs text-gray-400">
+                  Destination options unlock after you pick a playlist. Choose where to transfer on the next screen.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -592,7 +618,14 @@ const Home = () => {
             <button
               type="button"
               onClick={handleGoToPlaylists}
-              className="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 rounded-full transition duration-300"
+              disabled={!sourceProviderValue}
+              className={`w-full font-semibold py-3 rounded-full transition duration-300 ${
+                !sourceProviderValue
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed opacity-70"
+                  : canProceedToPlaylists
+                  ? "bg-green-500 hover:bg-green-600 text-white"
+                  : "bg-purple-500 hover:bg-purple-600 text-white"
+              }`}
             >
               Continue to playlists
             </button>

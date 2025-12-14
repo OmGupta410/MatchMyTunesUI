@@ -6,7 +6,7 @@ import { create } from "zustand";
 export const useSelectionStore = create((set, get) => ({
   selectedPlaylists: [],
   destinationService: null,
-  sourceService: "spotify",
+  sourceService: null,
   lastTransferJob: null,
   activeJobStatus: null,
 
@@ -64,11 +64,11 @@ export const useSelectionStore = create((set, get) => ({
   },
 
   setDestinationService: (service) => {
-    set({ destinationService: service });
+    set({ destinationService: service || null });
   },
 
   setSourceService: (service) => {
-    set({ sourceService: service || "spotify" });
+    set({ sourceService: service || null });
   },
 
   getSourceProvider: () => {
