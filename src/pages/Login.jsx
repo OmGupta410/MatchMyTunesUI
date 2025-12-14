@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
+import { authApi, API_BASE_URL } from "../lib/api.js";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +21,7 @@ const Login = () => {
 
     // Open popup window for Spotify login
     const popup = window.open(
-      "https://matchmytunes.onrender.com/api/auth/spotify/login",
+      authApi.spotifyLoginUrl(),
       "MatchMyTunesLogin",
       `width=${width},height=${height},top=${top},left=${left}`
     );
@@ -33,7 +34,7 @@ const Login = () => {
     // Listen for messages from popup
     const messageHandler = (event) => {
       const allowedOrigins = [
-        "https://matchmytunes.onrender.com",
+        API_BASE_URL,
         window.location.origin
       ];
       
