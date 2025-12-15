@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelectionStore } from '../../store/selection';
 import { ServiceCard } from '../../components/service-card';
@@ -11,6 +11,9 @@ import {
   isSpotifyConnected,
 } from '../../lib/spotify';
 import toast from 'react-hot-toast';
+
+const COMPLETED_STATUSES = new Set(['completed', 'success', 'finished', 'done']);
+const FAILED_STATUSES = new Set(['failed', 'error', 'cancelled', 'canceled', 'aborted']);
 
 const TransferSetup = () => {
   const navigate = useNavigate();
@@ -29,6 +32,442 @@ const TransferSetup = () => {
   const [fromService, setFromService] = useState('spotify');
   const [toService, setToService] = useState(destinationService || null);
   const [transferring, setTransferring] = useState(false);
+  const [jobStatuses, setJobStatuses] = useState({});
+  const jobPollersRef = useRef({});
+  const syntheticProgressIntervalsRef = useRef({});
+  const componentUnmountedRef = useRef(false);
+
+  const updateJobStatus = useCallback((playlistId, partial) => {
+    if (!playlistId) {
+      return;
+    }
+
+    if (componentUnmountedRef.current) {
+      return;
+    }
+
+    setJobStatuses((previousState) => {
+      const existing = previousState[playlistId] || {};
+      const merged = { ...existing, ...partial };
+
+      if (partial.status && typeof partial.status === 'string') {
+        merged.status = partial.status.toLowerCase();
+        merged.statusLabel = partial.status;
+      } else if (!partial.status && existing.status && merged.status !== existing.status) {
+        merged.status = existing.status;
+      }
+
+      if (partial.statusLabel && typeof partial.statusLabel === 'string' && !partial.status) {
+        merged.statusLabel = partial.statusLabel;
+      } else if (!merged.statusLabel && existing.statusLabel) {
+        merged.statusLabel = existing.statusLabel;
+      }
+
+      if (typeof partial.syntheticProgress === 'boolean') {
+        merged.syntheticProgress = partial.syntheticProgress;
+      } else if (typeof merged.syntheticProgress !== 'boolean' && typeof existing.syntheticProgress === 'boolean') {
+        merged.syntheticProgress = existing.syntheticProgress;
+      }
+
+      return {
+        ...previousState,
+        [playlistId]: merged,
+      };
+    });
+  }, []);
+
+  const clearJobPoller = useCallback((jobId) => {
+    if (!jobId) {
+      return;
+    }
+
+    const poller = jobPollersRef.current[jobId];
+    if (poller) {
+      clearInterval(poller);
+      delete jobPollersRef.current[jobId];
+    }
+  }, []);
+
+  const stopSyntheticProgress = useCallback((playlistId) => {
+    if (!playlistId) {
+      return;
+    }
+
+    const intervalId = syntheticProgressIntervalsRef.current[playlistId];
+    if (intervalId) {
+      clearInterval(intervalId);
+      delete syntheticProgressIntervalsRef.current[playlistId];
+    }
+  }, []);
+
+  const ensureSyntheticProgress = useCallback((playlistId) => {
+    if (!playlistId) {
+      return;
+    }
+
+    if (syntheticProgressIntervalsRef.current[playlistId]) {
+      return;
+    }
+
+    syntheticProgressIntervalsRef.current[playlistId] = setInterval(() => {
+      if (componentUnmountedRef.current) {
+        stopSyntheticProgress(playlistId);
+        return;
+      }
+
+      setJobStatuses((previous) => {
+        const job = previous[playlistId];
+        if (!job) {
+          stopSyntheticProgress(playlistId);
+          return previous;
+        }
+
+        const normalizedStatus = typeof job.status === 'string' ? job.status.toLowerCase() : job.status;
+        if (
+          (normalizedStatus && (COMPLETED_STATUSES.has(normalizedStatus) || FAILED_STATUSES.has(normalizedStatus))) ||
+          (typeof job.progress === 'number' && job.progress >= 90)
+        ) {
+          stopSyntheticProgress(playlistId);
+          return previous;
+        }
+
+        const currentProgress = typeof job.progress === 'number' ? job.progress : 0;
+        const nextStep = Math.min(90, Math.max(10, Math.ceil((currentProgress || 0) / 10) * 10));
+        const computedNext = nextStep <= currentProgress ? Math.min(90, currentProgress + 10) : nextStep;
+
+        const updatedJob = {
+          ...job,
+          progress: computedNext,
+          message: job.message || 'Transferring...',
+          status: job.status || 'processing',
+          statusLabel: job.statusLabel || 'processing',
+          syntheticProgress: true,
+        };
+
+        return {
+          ...previous,
+          [playlistId]: updatedJob,
+        };
+      });
+    }, 1000);
+  }, [stopSyntheticProgress]);
+
+  useEffect(() => {
+    componentUnmountedRef.current = false;
+
+    return () => {
+      componentUnmountedRef.current = true;
+      Object.values(jobPollersRef.current).forEach((intervalId) => {
+        clearInterval(intervalId);
+      });
+      jobPollersRef.current = {};
+
+      Object.values(syntheticProgressIntervalsRef.current).forEach((intervalId) => {
+        clearInterval(intervalId);
+      });
+      syntheticProgressIntervalsRef.current = {};
+    };
+  }, []);
+
+  const transferProgress = useMemo(() => {
+    const jobs = Object.values(jobStatuses);
+
+    if (jobs.length === 0) {
+      return {
+        overallPercent: 0,
+        completed: 0,
+        failed: 0,
+        total: 0,
+        activeJob: null,
+      };
+    }
+
+    let progressAccumulator = 0;
+    let completed = 0;
+    let failed = 0;
+    let activeJob = null;
+
+    for (const job of jobs) {
+      const normalizedStatus = typeof job.status === 'string' ? job.status.toLowerCase() : job.status;
+
+      if (normalizedStatus && COMPLETED_STATUSES.has(normalizedStatus)) {
+        completed += 1;
+      }
+
+      if (normalizedStatus && FAILED_STATUSES.has(normalizedStatus)) {
+        failed += 1;
+      }
+
+      const jobProgress = typeof job.progress === 'number'
+        ? Math.min(100, Math.max(0, job.progress))
+        : normalizedStatus && COMPLETED_STATUSES.has(normalizedStatus)
+          ? 100
+          : 0;
+
+      progressAccumulator += jobProgress;
+
+      if (!activeJob) {
+        if (!normalizedStatus) {
+          activeJob = job;
+        } else if (!COMPLETED_STATUSES.has(normalizedStatus) && !FAILED_STATUSES.has(normalizedStatus)) {
+          activeJob = job;
+        }
+      }
+    }
+
+    const averageProgress = Math.round(progressAccumulator / jobs.length);
+
+    return {
+      overallPercent: Math.min(100, Math.max(0, averageProgress)),
+      completed,
+      failed,
+      total: jobs.length,
+      activeJob,
+    };
+  }, [jobStatuses]);
+
+  useEffect(() => {
+    Object.entries(jobStatuses).forEach(([playlistId, job]) => {
+      const normalizedStatus = typeof job.status === 'string' ? job.status.toLowerCase() : job.status;
+      const jobFinished = normalizedStatus && (COMPLETED_STATUSES.has(normalizedStatus) || FAILED_STATUSES.has(normalizedStatus));
+      const hasApiProgress =
+        !job.syntheticProgress &&
+        (
+          (typeof job.totalTracks === 'number' && job.totalTracks > 0) ||
+          (typeof job.processedTracks === 'number' && job.processedTracks > 0) ||
+          (typeof job.progress === 'number' && job.progress > 0)
+        );
+
+      if (jobFinished || !transferring) {
+        stopSyntheticProgress(playlistId);
+        return;
+      }
+
+      if (hasApiProgress) {
+        stopSyntheticProgress(playlistId);
+        return;
+      }
+
+      ensureSyntheticProgress(playlistId);
+    });
+
+    if (!transferring) {
+      Object.keys(jobStatuses).forEach((playlistId) => {
+        stopSyntheticProgress(playlistId);
+      });
+    }
+  }, [ensureSyntheticProgress, jobStatuses, stopSyntheticProgress, transferring]);
+
+  const parseProgressFromStatus = useCallback((statusPayload) => {
+    if (!statusPayload || typeof statusPayload !== 'object') {
+      return {
+        progressPercent: 0,
+        processedTracks: 0,
+        totalTracks: 0,
+        message: '',
+      };
+    }
+
+    const totalCandidates = [
+      statusPayload.totalTracks,
+      statusPayload.total_tracks,
+      statusPayload.total,
+      statusPayload.tracksTotal,
+      statusPayload.trackTotal,
+      statusPayload.targetCount,
+    ];
+
+    const processedCandidates = [
+      statusPayload.processedTracks,
+      statusPayload.processed_tracks,
+      statusPayload.processed,
+      statusPayload.completed,
+      statusPayload.completedTracks,
+      statusPayload.tracksProcessed,
+      statusPayload.current,
+    ];
+
+    const totalTracks = totalCandidates.find((value) => typeof value === 'number' && !Number.isNaN(value)) || 0;
+    const processedTracks = processedCandidates.find((value) => typeof value === 'number' && !Number.isNaN(value)) || 0;
+
+    let progressPercent = 0;
+    if (typeof statusPayload.progress === 'number') {
+      const rawProgress = statusPayload.progress <= 1 ? statusPayload.progress * 100 : statusPayload.progress;
+      progressPercent = Math.round(Math.min(100, Math.max(0, rawProgress)));
+    } else if (totalTracks > 0) {
+      progressPercent = Math.round(Math.min(1, processedTracks / totalTracks) * 100);
+    }
+
+    const message = typeof statusPayload.message === 'string'
+      ? statusPayload.message
+      : typeof statusPayload.stage === 'string'
+        ? statusPayload.stage
+        : '';
+
+    return {
+      progressPercent,
+      processedTracks,
+      totalTracks,
+      message,
+    };
+  }, []);
+
+  const pollTransferJob = useCallback(
+    (jobId, playlist, token) => {
+      if (!jobId || !token) {
+        return Promise.resolve(null);
+      }
+
+      return new Promise((resolve, reject) => {
+        const playlistId = playlist?.id;
+        const playlistName = playlist?.name || 'Playlist';
+        let consecutiveFailures = 0;
+
+        const poll = async () => {
+          try {
+            const statusResponse = await fetch(
+              `https://matchmytunes.onrender.com/api/transfer/${jobId}/status`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            if (!statusResponse.ok) {
+              throw new Error(`HTTP ${statusResponse.status}`);
+            }
+
+            const statusData = await statusResponse.json().catch(() => ({}));
+            const normalizedStatus =
+              typeof statusData.status === 'string' ? statusData.status.toLowerCase() : undefined;
+
+            const { progressPercent, processedTracks, totalTracks, message } =
+              parseProgressFromStatus(statusData);
+
+            consecutiveFailures = 0;
+
+            updateJobStatus(playlistId, {
+              jobId,
+              playlistName,
+              status: normalizedStatus || statusData.status || 'processing',
+              statusLabel: statusData.status || 'processing',
+              progress: progressPercent,
+              processedTracks,
+              totalTracks,
+              message,
+              lastUpdatedAt: Date.now(),
+              syntheticProgress: false,
+            });
+
+            const isComplete =
+              (normalizedStatus && COMPLETED_STATUSES.has(normalizedStatus)) ||
+              statusData.isComplete === true ||
+              statusData.finished === true;
+
+            const isFailed =
+              (normalizedStatus && FAILED_STATUSES.has(normalizedStatus)) ||
+              statusData.failed === true ||
+              statusData.error === true;
+
+            if (isComplete) {
+              clearJobPoller(jobId);
+              updateJobStatus(playlistId, {
+                jobId,
+                playlistName,
+                status: 'completed',
+                statusLabel: statusData.status || 'completed',
+                progress: 100,
+                processedTracks: totalTracks || processedTracks,
+                totalTracks: totalTracks || processedTracks,
+                message: message || 'Transfer completed',
+                syntheticProgress: false,
+              });
+              resolve(statusData);
+              return;
+            }
+
+            if (isFailed) {
+              clearJobPoller(jobId);
+              updateJobStatus(playlistId, {
+                jobId,
+                playlistName,
+                status: 'failed',
+                statusLabel: statusData.status || 'failed',
+                progress: progressPercent,
+                processedTracks,
+                totalTracks,
+                message:
+                  (statusData && statusData.message) || message || 'Transfer failed',
+                syntheticProgress: false,
+              });
+              reject(statusData);
+              return;
+            }
+          } catch (error) {
+            if (consecutiveFailures < 2) {
+              consecutiveFailures += 1;
+              return;
+            }
+
+            updateJobStatus(playlistId, {
+              jobId,
+              playlistName,
+              status: 'failed',
+              statusLabel: 'failed',
+              progress: 0,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : 'Transfer status polling failed',
+              syntheticProgress: false,
+            });
+
+            clearJobPoller(jobId);
+            reject(error);
+          }
+        };
+
+        poll();
+        clearJobPoller(jobId);
+        jobPollersRef.current[jobId] = setInterval(poll, 2000);
+      });
+    },
+    [clearJobPoller, parseProgressFromStatus, updateJobStatus]
+  );
+
+  const activeJobMessage = useMemo(() => {
+    const job = transferProgress.activeJob;
+
+    if (!job) {
+      return '';
+    }
+
+    const name = job.playlistName || 'Playlist';
+    const processedTracks =
+      typeof job.processedTracks === 'number' && !Number.isNaN(job.processedTracks)
+        ? job.processedTracks
+        : null;
+    const totalTracks =
+      typeof job.totalTracks === 'number' && !Number.isNaN(job.totalTracks)
+        ? job.totalTracks
+        : null;
+
+    if (totalTracks && totalTracks > 0 && processedTracks !== null) {
+      return `Processing "${name}" — ${processedTracks}/${totalTracks} tracks`;
+    }
+
+    if (processedTracks !== null && processedTracks > 0) {
+      return `Processing "${name}" — ${processedTracks} tracks processed`;
+    }
+
+    if (job.message) {
+      return `Processing "${name}" — ${job.message}`;
+    }
+
+    return `Processing "${name}"`;
+  }, [transferProgress]);
 
   useEffect(() => {
     const savedToService = sessionStorage.getItem('selected_destination');
@@ -237,29 +676,45 @@ const TransferSetup = () => {
       return;
     }
 
+    setJobStatuses({});
     setTransferring(true);
 
     try {
       const results = [];
 
       for (const playlist of playlistsSelection) {
+        const playlistId = playlist?.id;
+        const playlistName =
+          playlist?.name || (playlistId ? `Playlist ${playlistId}` : 'Unknown playlist');
+
         try {
-          if (!playlist || !playlist.id) {
+          if (!playlist || !playlistId) {
             results.push({
               success: false,
-              playlistName: playlist?.name || 'Unknown playlist',
+              playlistName: playlistName,
               error: 'Invalid playlist ID',
             });
             continue;
           }
 
-          if (playlist.id.startsWith('favorite-')) {
-            console.warn('Skipping favorite item:', playlist.id);
+          if (playlistId.startsWith('favorite-')) {
+            console.warn('Skipping favorite item:', playlistId);
+            updateJobStatus(playlistId, {
+              playlistName,
+              status: 'failed',
+              statusLabel: 'failed',
+              progress: 0,
+              message:
+                'Favorite items cannot be transferred as playlists. Please select actual playlists.',
+              syntheticProgress: false,
+            });
+
             results.push({
               success: false,
-              playlistName: playlist.name || 'Favorite item',
+              playlistName,
               error: 'Favorite items cannot be transferred as playlists. Please select actual playlists.',
             });
+
             toast.error(
               `"${playlist.name || 'Favorite item'}" cannot be transferred - select actual playlists only`,
               { duration: 4000 }
@@ -267,13 +722,25 @@ const TransferSetup = () => {
             continue;
           }
 
+          updateJobStatus(playlistId, {
+            jobId: null,
+            playlistName,
+            status: 'starting',
+            statusLabel: 'starting',
+            progress: 0,
+            processedTracks: 0,
+            totalTracks: 0,
+            message: 'Starting transfer...',
+            syntheticProgress: false,
+          });
+
           const destinationProvider = toService === 'youtube-music' ? 'youtube' : toService;
 
           const transferPayload = {
             sourceProvider: 'spotify',
-            sourcePlaylistId: playlist.id,
+            sourcePlaylistId: playlistId,
             destinationProvider,
-            newPlaylistName: playlist.name || `Playlist ${playlist.id}`,
+            newPlaylistName: playlist.name || `Playlist ${playlistId}`,
           };
 
           const response = await fetch('https://matchmytunes.onrender.com/api/transfer', {
@@ -286,39 +753,136 @@ const TransferSetup = () => {
           });
 
           const responseData = await response.json().catch(() => ({}));
+          const jobId =
+            responseData?.jobId ||
+            responseData?.job_id ||
+            responseData?.id ||
+            (responseData?.job && (responseData.job.id || responseData.job.jobId));
 
           if (!response.ok) {
             const errorMessage =
               (responseData && (responseData.message || responseData.error)) ||
-              `HTTP ${response.status}: Failed to transfer ${playlist.name || 'playlist'}`;
+              `HTTP ${response.status}: Failed to transfer ${playlistName}`;
 
-            console.error('Transfer failed for playlist:', playlist.name, errorMessage);
+            updateJobStatus(playlistId, {
+              jobId,
+              playlistName,
+              status: 'failed',
+              statusLabel: 'failed',
+              progress: 0,
+              message: errorMessage,
+              syntheticProgress: false,
+            });
+
+            console.error('Transfer failed for playlist:', playlistName, errorMessage);
             results.push({
               success: false,
-              playlistName: playlist.name || 'Unknown playlist',
+              playlistName,
               error: errorMessage,
             });
-            toast.error(`Failed to transfer "${playlist.name || 'playlist'}": ${errorMessage}`, {
+
+            toast.error(`Failed to transfer "${playlistName}": ${errorMessage}`, {
               duration: 5000,
             });
+            continue;
+          }
+
+          if (jobId) {
+            updateJobStatus(playlistId, {
+              jobId,
+              playlistName,
+              status: 'queued',
+              statusLabel: responseData.status || 'queued',
+              progress: 0,
+              message: 'Waiting for transfer to start...',
+              syntheticProgress: false,
+            });
+
+            try {
+              const jobResult = await pollTransferJob(jobId, playlist, token);
+              const resultPayload =
+                jobResult && Object.keys(jobResult).length > 0 ? jobResult : responseData;
+
+              results.push({
+                success: true,
+                playlistName,
+                data: resultPayload,
+              });
+
+              toast.success(`Transferred "${playlistName}"`, { duration: 3000 });
+            } catch (pollError) {
+              const pollErrorMessage =
+                (pollError && pollError.message) ||
+                (pollError && pollError.error) ||
+                'Transfer failed while processing';
+
+              updateJobStatus(playlistId, {
+                jobId,
+                playlistName,
+                status: 'failed',
+                statusLabel: 'failed',
+                progress: 0,
+                message: pollErrorMessage,
+                syntheticProgress: false,
+              });
+
+              console.error('Transfer job failed:', playlistName, pollError);
+              results.push({
+                success: false,
+                playlistName,
+                error: pollErrorMessage,
+              });
+
+              toast.error(`Failed to transfer "${playlistName}": ${pollErrorMessage}`, {
+                duration: 5000,
+              });
+            } finally {
+              clearJobPoller(jobId);
+            }
           } else {
-            console.log('Successfully transferred:', playlist.name, responseData);
+            updateJobStatus(playlistId, {
+              jobId: null,
+              playlistName,
+              status: 'completed',
+              statusLabel: responseData.status || 'completed',
+              progress: 100,
+              processedTracks: responseData?.totalTracks || 0,
+              totalTracks: responseData?.totalTracks || 0,
+              message: responseData?.message || 'Transfer completed',
+              syntheticProgress: false,
+            });
+
             results.push({
               success: true,
-              playlistName: playlist.name || 'Unknown playlist',
+              playlistName,
               data: responseData,
             });
-            toast.success(`Transferred "${playlist.name || 'playlist'}"`, { duration: 3000 });
+
+            toast.success(`Transferred "${playlistName}"`, { duration: 3000 });
           }
         } catch (error) {
-          console.error('Error transferring playlist:', playlist?.name, error);
           const message = error && error.message ? error.message : 'Unknown error';
+
+          if (playlistId) {
+            updateJobStatus(playlistId, {
+              jobId: null,
+              playlistName,
+              status: 'failed',
+              statusLabel: 'failed',
+              progress: 0,
+              message,
+              syntheticProgress: false,
+            });
+          }
+
+          console.error('Error transferring playlist:', playlist?.name, error);
           results.push({
             success: false,
-            playlistName: playlist?.name || 'Unknown playlist',
+            playlistName,
             error: message,
           });
-          toast.error(`Error transferring "${playlist?.name || 'playlist'}": ${message}`, {
+
+          toast.error(`Error transferring "${playlistName}": ${message}`, {
             duration: 5000,
           });
         }
@@ -368,6 +932,12 @@ const TransferSetup = () => {
       const message = error && error.message ? error.message : 'Failed to initiate transfer';
       toast.error(message, { duration: 5000 });
     } finally {
+      Object.keys(jobPollersRef.current).forEach((jobId) => {
+        clearJobPoller(jobId);
+      });
+      Object.keys(syntheticProgressIntervalsRef.current).forEach((playlistId) => {
+        stopSyntheticProgress(playlistId);
+      });
       setTransferring(false);
     }
   };
@@ -538,6 +1108,24 @@ const TransferSetup = () => {
           >
             {transferring ? 'Transferring...' : 'Launch transfer'}
           </button>
+
+          {transferring && transferProgress.total > 0 && (
+            <div className="w-full max-w-md">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full bg-green-500 transition-all duration-500 ease-out"
+                  style={{ width: `${transferProgress.overallPercent}%` }}
+                />
+              </div>
+              <p className="mt-3 text-xs text-gray-300 text-center">
+                Completed {transferProgress.completed} of {transferProgress.total} playlist
+                {transferProgress.total !== 1 ? 's' : ''} ({transferProgress.overallPercent}%)
+              </p>
+              {activeJobMessage && (
+                <p className="mt-1 text-xs text-gray-400 text-center">{activeJobMessage}</p>
+              )}
+            </div>
+          )}
 
           {(toService === 'youtube' || toService === 'youtube-music') && !isYouTubeConnected() && (
             <p className="text-sm text-yellow-400 text-center max-w-md">
