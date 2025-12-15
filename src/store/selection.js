@@ -17,6 +17,7 @@ const sanitizePlaylist = (playlist) => {
 export const useSelectionStore = create((set, get) => ({
   selectedPlaylists: [],
   destinationService: null,
+  sourceService: null,
 
   addPlaylist: (playlist) => {
     const safePlaylist = sanitizePlaylist(playlist);
@@ -71,5 +72,9 @@ export const useSelectionStore = create((set, get) => ({
 
   setDestinationService: (service) => {
     set({ destinationService: service || null });
+  },
+
+  setSourceService: (service) => {
+    set({ sourceService: service || null });
   },
 }));

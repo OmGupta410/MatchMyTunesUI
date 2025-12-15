@@ -2,6 +2,20 @@ const API_BASE = 'https://matchmytunes.onrender.com';
 
 const toBooleanString = (value) => (value ? 'true' : 'false');
 
+const normalizeProvider = (provider) => {
+  if (!provider) {
+    return 'spotify';
+  }
+
+  const normalized = String(provider).trim().toLowerCase();
+
+  if (normalized === 'youtube' || normalized === 'youtube-music') {
+    return 'youtube';
+  }
+
+  return 'spotify';
+};
+
 export const getAuthToken = () => {
   return sessionStorage.getItem('jwt') || localStorage.getItem('jwt');
 };
@@ -150,15 +164,16 @@ export const handleYouTubeCallback = async (code) => {
 };
 
 export const fetchUserProfile = async () => {
-  const playlists = await fetchPlaylists();
+  const playlists = await fetchPlaylists('spotify');
   if (playlists && typeof playlists === 'object' && playlists.user) {
     return playlists.user;
   }
   return { display_name: 'User', images: [] };
 };
 
-export const fetchPlaylists = async () => {
-  return fetchWithAuth(`${API_BASE}/api/playlists/spotify`);
+export const fetchPlaylists = async (provider = 'spotify') => {
+  const normalizedProvider = normalizeProvider(provider);
+  return fetchWithAuth(`${API_BASE}/api/playlists/${normalizedProvider}`);
 };
 
 export const fetchFavoriteSongs = async () => {

@@ -1,20 +1,50 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { disconnectSpotify, disconnectYouTube, isSpotifyConnected, isYouTubeConnected } from '../lib/spotify'; 
+import { isSpotifyConnected, isYouTubeConnected } from '../lib/spotify'; 
+import { useSelectionStore } from '../store/selection';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { setSourceService } = useSelectionStore();
 
   // =========================
   // STATE
   // =========================
-  const [fromService, setFromService] = useState("");
-  const [toService, setToService] = useState("");
-  
+  const [selectedSource, setSelectedSource] = useState('');
+
   // Track connection status
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
+
+  const persistSourceSelection = useCallback((serviceId) => {
+    const normalized = serviceId === 'youtube' ? 'youtube' : 'spotify';
+    setSelectedSource(normalized);
+    setSourceService(normalized);
+
+    try {
+      sessionStorage.setItem('selected_source', normalized);
+    } catch (error) {
+      // Ignore storage write failures (e.g., private mode)
+    }
+  }, [setSourceService]);
+
+  const navigateToPlaylists = useCallback((serviceId, extraParams) => {
+    const normalized = serviceId === 'youtube' ? 'youtube' : 'spotify';
+    persistSourceSelection(normalized);
+
+    const params = new URLSearchParams({ source: normalized });
+
+    if (extraParams && typeof extraParams === 'object') {
+      Object.entries(extraParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.set(key, String(value));
+        }
+      });
+    }
+
+    navigate(`/auth/spotify/callback?${params.toString()}`);
+  }, [navigate, persistSourceSelection]);
 
   // =========================
   // AUTHENTICATION LOGIC
@@ -55,12 +85,15 @@ const Home = () => {
               sessionStorage.setItem("spotify_connected", "true");
               localStorage.setItem("spotify_connected", "true");
               setSpotifyConnected(true);
-              navigate("/auth/spotify/callback");
+              persistSourceSelection('spotify');
+              navigateToPlaylists('spotify');
             }
             if (provider === "YouTube") {
               sessionStorage.setItem("youtube_connected", "true");
               localStorage.setItem("youtube_connected", "true");
               setYoutubeConnected(true);
+              persistSourceSelection('youtube');
+              navigateToPlaylists('youtube');
             }
           }
           return;
@@ -96,13 +129,14 @@ const Home = () => {
                 localStorage.setItem("spotify_connected", "true");
                 setSpotifyConnected(true);
                 popup.close();
-                navigate("/auth/spotify/callback" + (code ? `?code=${code}` : ''));
+                navigateToPlaylists('spotify', code ? { code } : undefined);
               }
               if (provider === "YouTube") {
                 sessionStorage.setItem("youtube_connected", "true");
                 localStorage.setItem("youtube_connected", "true");
                 setYoutubeConnected(true);
                 popup.close();
+                navigateToPlaylists('youtube');
               }
             } else if (popupUrl.includes('success') || popupUrl.includes('Authentication Successful')) {
               // Success page detected, close popup and check for token
@@ -111,7 +145,7 @@ const Home = () => {
                 popup.close();
                 // Try to fetch token from backend or check storage
                 if (provider === "Spotify") {
-                  navigate("/auth/spotify/callback");
+                  navigateToPlaylists('spotify');
                 }
               }, 1000);
             }
@@ -153,7 +187,7 @@ const Home = () => {
       }
 
       if (event.data.type === "AUTH_SUCCESS") {
-        const { token, userId, provider } = event.data;
+        const { token, userId, provider, code } = event.data;
         
         console.log(`Login successful with ${provider}!`);
         
@@ -168,24 +202,29 @@ const Home = () => {
         }
 
         // Update state to show "Connected" in the UI
-        if (provider === "Spotify" || provider === "spotify") {
+        const normalizedProvider = typeof provider === 'string' ? provider.toLowerCase() : '';
+
+        if (normalizedProvider === "spotify") {
           sessionStorage.setItem("spotify_connected", "true");
           localStorage.setItem("spotify_connected", "true");
           setSpotifyConnected(true);
+          persistSourceSelection('spotify');
           // Redirect to callback page to load playlists
-          navigate("/auth/spotify/callback");
+          navigateToPlaylists('spotify', code ? { code } : undefined);
         }
-        if (provider === "YouTube" || provider === "youtube") {
+        if (normalizedProvider === "youtube") {
           sessionStorage.setItem("youtube_connected", "true");
           localStorage.setItem("youtube_connected", "true");
           setYoutubeConnected(true);
+          persistSourceSelection('youtube');
+          navigateToPlaylists('youtube');
         }
       }
     };
 
     window.addEventListener("message", messageHandler);
     return () => window.removeEventListener("message", messageHandler);
-  }, [navigate]);
+  }, [navigateToPlaylists, persistSourceSelection]);
 
   // Check for existing auth on mount
   useEffect(() => {
@@ -196,87 +235,82 @@ const Home = () => {
     setYoutubeConnected(youtubeConnected);
   }, []);
 
-  // Handle disconnect
-  const handleDisconnectSpotify = () => {
-    if (window.confirm('Are you sure you want to disconnect Spotify?')) {
-      disconnectSpotify();
-      setSpotifyConnected(false);
-      if (fromService === "Spotify") setFromService("");
-      toast.success('Spotify disconnected');
+  useEffect(() => {
+    try {
+      const storedSource = sessionStorage.getItem('selected_source');
+      if ((storedSource === 'spotify' || storedSource === 'youtube') && storedSource !== selectedSource) {
+        persistSourceSelection(storedSource);
+        return;
+      }
+    } catch (error) {
+      // Ignore storage read issues (e.g., private browsing)
     }
-  };
 
-  const handleDisconnectYouTube = () => {
-    if (window.confirm('Are you sure you want to disconnect YouTube?')) {
-      disconnectYouTube();
-      setYoutubeConnected(false);
-      if (toService === "YouTube" || toService === "YT Music") setToService("");
-      toast.success('YouTube disconnected');
+    if (!selectedSource && spotifyConnected) {
+      persistSourceSelection('spotify');
     }
-  };
+  }, [persistSourceSelection, selectedSource, spotifyConnected]);
 
-  // SERVICES LIST
-  // Added 'provider' property to map UI names to backend provider names
-  const services = [
-    { name: "Spotify", icon: "fa-brands fa-spotify", provider: "Spotify" },
-    { name: "Apple", icon: "fa-brands fa-apple" },
-    { name: "YT Music", icon: "fa-brands fa-youtube", provider: "YouTube" }, 
-    { name: "YouTube", icon: "fa-brands fa-youtube", provider: "YouTube" },
-    { name: "Deezer", icon: "fa-brands fa-deezer" },
-    { name: "TIDAL", icon: "fa-brands fa-tidal" },
-    { name: "Amazon", icon: "fa-brands fa-amazon" },
-    { name: "SoundCloud", icon: "fa-brands fa-soundcloud" },
+  const sourceOptions = [
+    { id: 'spotify', label: 'Spotify', iconClass: 'fa-brands fa-spotify', isActive: true, connected: spotifyConnected },
+    { id: 'youtube', label: 'YouTube', iconClass: 'fa-brands fa-youtube', isActive: true, connected: youtubeConnected },
+    { id: 'apple-music', label: 'Apple Music', iconClass: 'fa-brands fa-apple', isActive: false },
+    { id: 'amazon-music', label: 'Amazon Music', iconClass: 'fa-brands fa-amazon', isActive: false },
+    { id: 'deezer', label: 'Deezer', iconClass: 'fa-brands fa-deezer', isActive: false },
+    { id: 'tidal', label: 'TIDAL', iconClass: 'fa-brands fa-tidal', isActive: false },
+    { id: 'soundcloud', label: 'SoundCloud', iconClass: 'fa-brands fa-soundcloud', isActive: false },
   ];
 
-  // WHEN A SERVICE IS CLICKED
-  const handleSelect = (service) => {
-    const serviceName = service.name;
-    // Some services in your list don't have a provider property yet (like Apple), 
-    // so we check if it exists before trying to login.
-    const provider = service.provider; 
+  const selectedSourceOption = sourceOptions.find((option) => option.id === selectedSource) || null;
 
-    // Logic to set From/To (Visual Selection)
-    if (!fromService) {
-      setFromService(serviceName);
-    } else if (!toService) {
-      setToService(serviceName);
-    } else {
-      setFromService(serviceName);
-      setToService("");
+  const handleSourceSelect = (option) => {
+    if (!option || !option.isActive) {
+      return;
     }
 
-    // Logic to trigger Login Popup (Functional Connection)
-    if (provider === "Spotify" && !spotifyConnected) {
-        handleLogin("Spotify");
+    const normalized = option.id === 'youtube' ? 'youtube' : 'spotify';
+    persistSourceSelection(normalized);
+
+    if (normalized === 'spotify') {
+      if (spotifyConnected) {
+        navigateToPlaylists('spotify');
+      } else {
+        handleLogin('Spotify');
+      }
+      return;
     }
-    else if (provider === "YouTube" && !youtubeConnected) {
-        handleLogin("YouTube");
+
+    if (normalized === 'youtube') {
+      if (youtubeConnected) {
+        navigateToPlaylists('youtube');
+      } else {
+        handleLogin('YouTube');
+      }
     }
   };
 
   const handleLaunch = () => {
-      // Check if Spotify is connected
-      if (!spotifyConnected) {
-          toast.error("Please connect Spotify first!");
-          return;
-      }
+    const effectiveSource = selectedSource || (spotifyConnected ? 'spotify' : '');
 
-      // If both services are selected and connected, go directly to playlist selection
-      // Then user can proceed to transfer setup (which will already have destination set)
-      if (fromService && toService && spotifyConnected && 
-          ((toService === "YouTube" || toService === "YT Music") && youtubeConnected)) {
-          // Both selected and connected - go to playlist selection
-          navigate('/auth/spotify/callback');
-      } else if (fromService && toService && !youtubeConnected && 
-                 (toService === "YouTube" || toService === "YT Music")) {
-          // YouTube selected but not connected
-          toast.error("Please connect YouTube first!");
-          handleLogin("YouTube");
-      } else {
-          // Just go to playlist selection
-          navigate('/auth/spotify/callback');
-      }
-  }
+    if (!effectiveSource) {
+      toast.error('Select a source platform to continue');
+      return;
+    }
+
+    if (effectiveSource === 'spotify' && !spotifyConnected) {
+      toast.error('Please connect Spotify first!');
+      handleLogin('Spotify');
+      return;
+    }
+
+    if (effectiveSource === 'youtube' && !youtubeConnected) {
+      toast.error('Please connect YouTube first!');
+      handleLogin('YouTube');
+      return;
+    }
+
+    navigateToPlaylists(effectiveSource);
+  };
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-white">
@@ -329,91 +363,78 @@ const Home = () => {
           ========================== */}
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-white/10">
             <h3 className="text-lg text-gray-300">Quick setup</h3>
-            <h2 className="text-2xl font-semibold mt-1 mb-6">
-              Transfer a playlist
-            </h2>
+            <h2 className="text-2xl font-semibold mt-1 mb-6">Choose your source</h2>
 
-            {/* FROM SERVICE */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-gray-400">FROM SERVICE</p>
-                {fromService === "Spotify" && spotifyConnected && (
-                  <button
-                    onClick={handleDisconnectSpotify}
-                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
-                    title="Disconnect Spotify"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Disconnect
-                  </button>
-                )}
-              </div>
-
-              <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
-                <p>{fromService || "Select a service"}</p>
-                {/* DYNAMIC CONNECTION STATUS */}
-                <span className={fromService === "Spotify" && spotifyConnected ? "text-green-400 text-xs font-bold" : "text-gray-400 text-xs"}>
-                   {(fromService === "Spotify" && spotifyConnected) || ((fromService === "YouTube" || fromService === "YT Music") && youtubeConnected) ? "Connected ✅" : "Not Connected"}
-                </span>
-              </div>
-            </div>
-
-            {/* TO SERVICE */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-gray-400">TO SERVICE</p>
-                {((toService === "YouTube" || toService === "YT Music") && youtubeConnected) && (
-                  <button
-                    onClick={handleDisconnectYouTube}
-                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
-                    title="Disconnect YouTube"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Disconnect
-                  </button>
-                )}
-              </div>
-
-              <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mt-1 flex justify-between items-center hover:bg-white/10 transition duration-300">
-                <p>{toService || "Select a service"}</p>
-                 {/* DYNAMIC CONNECTION STATUS */}
-                 <span className={toService === "Spotify" && spotifyConnected ? "text-green-400 text-xs font-bold" : "text-gray-400 text-xs"}>
-                   {(toService === "Spotify" && spotifyConnected) || ((toService === "YouTube" || toService === "YT Music") && youtubeConnected) ? "Connected ✅" : "Not Connected"}
-                </span>
-              </div>
-            </div>
-
-            {/* SUPPORTED SERVICES (CLICKABLE) */}
-            <p className="text-xs text-gray-400 mt-4">SUPPORTED SERVICES</p>
-
-            <div className="grid grid-cols-4 gap-3 mt-2 text-xs">
-              {services.map((service) => (
-                <div
-                  key={service.name}
-                  onClick={() => handleSelect(service)} // Pass the entire service object
-                  className={`p-2 border rounded text-center cursor-pointer flex flex-col items-center gap-1 transition duration-300
-                    ${
-                      fromService === service.name || toService === service.name
-                        ? "bg-white/10 border-white/30"
-                        : "border-white/10 hover:bg-white/10"
-                    }
-                  `}
-                >
-                  <i className={`${service.icon} text-xl`}></i>
-                  <span className="text-[11px]">{service.name}</span>
+            <div className="mb-6">
+              <p className="text-xs text-gray-400 mb-2">SOURCE PLATFORM</p>
+              <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    {selectedSourceOption ? selectedSourceOption.label : 'Select a platform'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {selectedSourceOption
+                      ? selectedSourceOption.isActive
+                        ? selectedSourceOption.connected
+                          ? 'Authenticated and ready'
+                          : 'Authenticate to continue'
+                        : 'Coming soon'
+                      : 'Pick a source to get started'}
+                  </p>
                 </div>
+                {selectedSourceOption && selectedSourceOption.isActive && (
+                  <span className={`text-xs font-medium ${selectedSourceOption.connected ? 'text-green-400' : 'text-yellow-300'}`}>
+                    {selectedSourceOption.connected ? 'Connected' : 'Not connected'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400">SUPPORTED SOURCES</p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-xs">
+              {sourceOptions.map((option) => (
+                option.isActive ? (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleSourceSelect(option)}
+                    className={`p-3 border rounded-lg text-center flex flex-col items-center gap-2 transition duration-300 ${
+                      selectedSource === option.id
+                        ? 'bg-white/10 border-white/30'
+                        : 'border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    <i className={`${option.iconClass} text-xl`}></i>
+                    <span className="text-[11px] font-semibold">{option.label}</span>
+                    <span className={`text-[10px] ${option.connected ? 'text-green-400' : 'text-gray-400'}`}>
+                      {option.connected ? 'Connected' : 'Authenticate'}
+                    </span>
+                  </button>
+                ) : (
+                  <div
+                    key={option.id}
+                    className="p-3 border border-white/5 rounded-lg text-center flex flex-col items-center gap-2 text-gray-500 bg-white/5 cursor-not-allowed opacity-60"
+                  >
+                    <i className={`${option.iconClass} text-xl`}></i>
+                    <span className="text-[11px] font-semibold">{option.label}</span>
+                    <span className="text-[10px] text-gray-400">Coming soon</span>
+                  </div>
+                )
               ))}
             </div>
 
-            <button 
-                onClick={handleLaunch}
-                className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold mt-5 py-3 rounded-full transition duration-300">
-              Launch transfer
+            <button
+              onClick={handleLaunch}
+              className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold mt-6 py-3 rounded-full transition duration-300"
+              type="button"
+            >
+              Continue to playlists
             </button>
+
+            <p className="text-[11px] text-gray-400 mt-3">
+              Authenticate your source platform. Destination selection happens after you review playlists.
+            </p>
           </div>
         </div>
       </section>
