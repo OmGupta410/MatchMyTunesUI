@@ -1,6 +1,23 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 const About = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const focus = params.get("focus");
+    if (!focus) {
+      return;
+    }
+    const target = document.getElementById(`about-${focus}`);
+    if (target) {
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, [location.search]);
+
   const pillars = [
     {
       title: "Seamless switching",
@@ -106,6 +123,39 @@ const About = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="mt-16 grid md:grid-cols-2 gap-6">
+          <div
+            id="about-share"
+            className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl"
+          >
+            <span className="text-indigo-300 text-xs uppercase tracking-widest">Share</span>
+            <h2 className="text-2xl font-semibold mt-2">Share playlists in one click</h2>
+            <p className="text-gray-400 text-sm mt-3">
+              Generate invite links that stay in sync across services. Share a Spotify mix and your friends on YouTube Music will see the same track list instantly.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-gray-300 list-disc list-inside">
+              <li>Branded share pages with artwork and track previews</li>
+              <li>Expiring links for drops and exclusive releases</li>
+              <li>Collaborative mode for crowd-sourced playlists</li>
+            </ul>
+          </div>
+          <div
+            id="about-backup"
+            className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl"
+          >
+            <span className="text-indigo-300 text-xs uppercase tracking-widest">Backup</span>
+            <h2 className="text-2xl font-semibold mt-2">Keep a copy of every set</h2>
+            <p className="text-gray-400 text-sm mt-3">
+              Export playlists to secure snapshots. Restore them whenever a service removes tracks or loses order—no more rebuilding a perfect mix.
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-gray-300 list-disc list-inside">
+              <li>Version history with notes and timestamps</li>
+              <li>Download as CSV or re-import directly</li>
+              <li>Automatic weekly backups for premium plans</li>
+            </ul>
           </div>
         </div>
       </div>
