@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Successful</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #050b2c 0%, #1c1f54 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #8B5CF6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 { margin-bottom: 0.5rem; }
+        p { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Authentication Successful!</h2>
+        <p id="status">Finalizing connection...</p>
+        <div class="spinner"></div>
+        <p style="font-size: 0.8em; opacity: 0.6; margin-top: 2rem;">This window will close automatically.</p>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const token = urlParams.get('token');
+        const userId = urlParams.get('userId');
+        // Default to Spotify if not provided, capitalize for display
+        const rawProvider = urlParams.get('provider') || 'Service';
+        const provider = rawProvider.charAt(0).toUpperCase() + rawProvider.slice(1);
+
+        document.getElementById('status').innerText = `Connecting to ${provider}...`;
+
+        // Function to send message
+        const sendMessage = () => {
+            if (window.opener) {
+                const message = {
+                    type: 'AUTH_SUCCESS',
+                    token: token,
+                    code: code,
+                    userId: userId,
+                    provider: rawProvider
+                };
+
+                // Send to common origins
+                // 1. The origin that opened this window (usually localhost or production domain)
+                window.opener.postMessage(message, window.location.origin);
+                
+                // 2. Explicitly target localhost ports often used in dev
+                window.opener.postMessage(message, "http://localhost:5173");
+                window.opener.postMessage(message, "http://localhost:3000");
+
+                // 3. Target production domain
+                window.opener.postMessage(message, "https://matchmytunes.onrender.com");
+                
+                // 4. Wildcard fallback (useful for dev, slightly less secure but acceptable for token handoff in this context)
+                window.opener.postMessage(message, "*");
+
+                setTimeout(() => window.close(), 1200);
+            } else {
+                // Fallback if no opener (e.g., opened in new tab manually)
+                document.querySelector('.container').innerHTML = `
+                    <h2>Finished!</h2>
+                    <p>You can close this tab and return to the app.</p>
+                `;
+                // Try redirecting to app callback route
+                setTimeout(() => {
+                     window.location.href = '/auth/spotify/callback' + (code ? '?code=' + code : '');
+                }, 1000);
+            }
+        };
+
+        sendMessage();
+    </script>
+</body>
+</html>

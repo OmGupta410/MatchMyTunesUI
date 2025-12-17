@@ -1,0 +1,25 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+  /* user-select: none; */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: "Poppins", "Roboto", "Helvetica", "Arial", sans-serif;
+  background: radial-gradient(
+    circle at top,
+    #1c1f54 0%,
+    #050b2c 45%,
+    #040720 100%
+  );
+  color: #f5f6ff;
+}
+
+#root {
+  min-height: 100vh;
+}
