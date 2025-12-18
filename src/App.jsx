@@ -12,6 +12,8 @@ import SpotifyCallback from "./pages/auth/spotify/callback";
 import TransferSetup from "./pages/transfer/setup";
 import TransferProgress from "./pages/transfer/progress";
 import Plans from "./pages/Plans";
+import BackupSelect from "./pages/backup/BackupSelect";
+import BackupDownload from "./pages/backup/BackupDownload";
 
 const darkTheme = createTheme({
   palette: {
@@ -95,6 +97,8 @@ function App() {
               <Route path="/auth/spotify/callback" element={<SpotifyCallback />} />
               <Route path="/transfer/setup" element={<TransferSetup />} />
               <Route path="/transfer/progress" element={<TransferProgress />} />
+              <Route path="/backup" element={<BackupSelect />} />
+              <Route path="/backup/download" element={<BackupDownload />} />
             </Route>
           </Routes>
         </Router>

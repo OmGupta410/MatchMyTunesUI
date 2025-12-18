@@ -43,7 +43,7 @@ export const removeStoredToken = () => {
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 20000,
+  timeout: 60000,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -98,6 +98,21 @@ export const authApi = {
   youtubeLoginUrl: () => `${API_BASE_URL}/api/auth/youtube/login`,
   spotifyCallback: (code) => unwrap(apiClient.get("/api/auth/spotify/callback", { params: { code } })),
   youtubeCallback: (code) => unwrap(apiClient.get("/api/auth/youtube/callback", { params: { code } })),
+};
+
+export const backupApi = {
+  downloadSingle: async (provider, playlistId) => {
+    const response = await apiClient.get(`/api/backup/${provider}/${playlistId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  downloadAll: async (provider) => {
+    const response = await apiClient.get(`/api/backup/${provider}/all`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
 };
 
 export const playlistApi = {

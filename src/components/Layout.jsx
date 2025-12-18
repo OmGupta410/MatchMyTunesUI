@@ -67,7 +67,7 @@ const Layout = () => {
         navigate("/about?focus=share");
         break;
       case "backup":
-        navigate("/about?focus=backup");
+        navigate("/backup"); // Changed from /about?focus=backup
         break;
       case "plans":
         navigate("/plans");
