@@ -1,44 +1,96 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
-const tiers = [
-  {
-    name: "Free",
-    price: "0",
-    description: "For casual listeners moving a few playlists every month.",
-    features: [
-      "Up to 3 playlist transfers per month",
-      "Sync between Spotify and YouTube",
-      "Manual backups",
-      "Email support within 48 hours",
-    ],
-    cta: "Get started",
-    highlighted: false,
-  },
-  {
-    name: "Premium",
-    price: "14",
-    description: "For collectors and DJs who need reliable, automated syncing.",
-    features: [
-      "Unlimited transfers and backups",
-      "Scheduled auto-sync every day",
-      "Priority matching and retries",
-      "Team sharing links",
-      "Priority support under 4 hours",
-    ],
-    cta: "Upgrade now",
-    highlighted: true,
-  },
-];
-
-const comparison = [
-  { label: "Playlist transfers", free: "3 / month", premium: "Unlimited" },
-  { label: "Supported services", free: "Spotify, YouTube", premium: "All current + beta" },
-  { label: "Auto backups", free: "Manual export", premium: "Scheduled weekly" },
-  { label: "Matching retries", free: "Basic", premium: "Smart retries" },
-  { label: "Support", free: "Email", premium: "Priority" },
-];
+const API_BASE_URL = "https://matchmytunes.onrender.com";
 
 const Plans = () => {
+  const navigate = useNavigate();
+
+  // PAYMENT / SYNC LOGIC
+  const upgradepremium = async () => {
+    // Check both storage locations just in case
+    const token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+    
+    if (!token) {
+        alert("Please log in first.");
+        navigate('/login');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/payment/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                planId: 1, // Assuming ID 1 is Premium based on your code
+                successUrl: window.location.origin + "/transfer/setup?status=premium_success", 
+                cancelUrl: window.location.origin + "/plans"
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.sessionUrl) {
+            window.location.href = data.sessionUrl;
+        } else {
+            alert("Could not initiate payment session.");
+        }
+    } catch (error) {
+        console.error("Payment error:", error);
+        alert("Something went wrong initiating the upgrade.");
+    }
+  };
+
+  const tiers = [
+    {
+      name: "Free",
+      price: "0",
+      description: "For casual listeners moving a few playlists every month.",
+      features: [
+        "Up to 3 playlist transfers per month",
+        "Sync between Spotify and YouTube",
+        "Manual backups",
+        "Email support within 48 hours",
+      ],
+      cta: "Get started",
+      highlighted: false,
+    },
+    {
+      name: "Premium",
+      price: "14",
+      description: "For collectors and DJs who need reliable, automated syncing.",
+      features: [
+        "Unlimited transfers and backups",
+        "Scheduled auto-sync every day",
+        "Priority matching and retries",
+        "Team sharing links",
+        "Priority support under 4 hours",
+      ],
+      cta: "Upgrade now",
+      highlighted: true,
+    },
+  ];
+
+  const comparison = [
+    { label: "Playlist transfers", free: "3 / month", premium: "Unlimited" },
+    { label: "Supported services", free: "Spotify, YouTube", premium: "All current + beta" },
+    { label: "Auto backups", free: "Manual export", premium: "Scheduled weekly" },
+    { label: "Matching retries", free: "Basic", premium: "Smart retries" },
+    { label: "Support", free: "Email", premium: "Priority" },
+  ];
+
+  const handleTierClick = (tierName) => {
+      if (tierName === "Premium") {
+          upgradepremium();
+      } else {
+          // For Free tier, just go to the transfer setup
+          navigate('/transfer/setup');
+      }
+  };
+
   return (
     <div className="min-h-screen bg-[#050b2c] text-white py-16 px-4">
       <div className="max-w-6xl mx-auto space-y-14">
@@ -92,6 +144,7 @@ const Plans = () => {
               </ul>
               <button
                 type="button"
+                onClick={() => handleTierClick(tier.name)}
                 className={`inline-flex justify-center items-center rounded-full px-5 py-2 text-sm font-semibold transition ${
                   tier.highlighted
                     ? "bg-purple-500 hover:bg-purple-600 text-white"

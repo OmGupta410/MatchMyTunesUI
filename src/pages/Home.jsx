@@ -187,7 +187,7 @@ const Home = () => {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                planId: 2, // Assuming ID 2 is Premium
+                planId: 1, // Assuming ID 2 is Premium
                 successUrl: window.location.origin + "/success", // Or wherever you want to redirect
                 cancelUrl: window.location.origin // Redirect back home on cancel
             })
@@ -394,8 +394,8 @@ const Home = () => {
                 </div>
             )}
             <div className="flex gap-10 mt-10">
-              <div><h3 className="text-2xl font-bold">12M+</h3><p className="text-gray-400 text-sm">Playlists processed</p></div>
-              <div><h3 className="text-2xl font-bold">85+</h3><p className="text-gray-400 text-sm">Supported services</p></div>
+              <div><h3 className="text-2xl font-bold">1.2k+</h3><p className="text-gray-400 text-sm">Playlists processed</p></div>
+              <div><h3 className="text-2xl font-bold">3+</h3><p className="text-gray-400 text-sm">Supported services</p></div>
             </div>
           </div>
 
@@ -547,7 +547,7 @@ const Home = () => {
       <section className="py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-center">
-            Popular conversions
+            Popular conversions 
           </h2>
           <p className="text-gray-400 text-center mt-2 mb-6 max-w-md mx-auto">
             These routes are used most by our users.
@@ -560,30 +560,6 @@ const Home = () => {
                 to: "YouTube Music",
                 fromIcon: "fa-brands fa-spotify",
                 toIcon: "fa-brands fa-youtube",
-              },
-              {
-                from: "Deezer",
-                to: "Spotify",
-                fromIcon: "fa-brands fa-deezer",
-                toIcon: "fa-brands fa-spotify",
-              },
-              {
-                from: "Spotify",
-                to: "Apple Music",
-                fromIcon: "fa-brands fa-spotify",
-                toIcon: "fa-brands fa-apple",
-              },
-              {
-                from: "Amazon Music",
-                to: "TIDAL",
-                fromIcon: "fa-brands fa-amazon",
-                toIcon: "fa-brands fa-tidal",
-              },
-              {
-                from: "TIDAL",
-                to: "Deezer",
-                fromIcon: "fa-brands fa-tidal",
-                toIcon: "fa-brands fa-deezer",
               },
               {
                 from: "YouTube Music",

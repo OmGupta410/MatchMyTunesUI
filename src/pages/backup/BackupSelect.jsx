@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { playlistApi, getStoredToken } from '../../lib/api';
+import { playlistApi, authApi, getStoredToken } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 const BackupSelect = () => {
   const navigate = useNavigate();
   const [provider, setProvider] = useState('spotify');
   const [playlists, setPlaylists] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [needsConnection, setNeedsConnection] = useState(false);
   
   // Selection State
   const [selectAll, setSelectAll] = useState(false);
@@ -19,51 +20,94 @@ const BackupSelect = () => {
         navigate('/login');
         return;
     }
+    
+    // Check specific connection status before fetching
+    if (provider === 'youtube' && sessionStorage.getItem('youtube_connected') !== 'true') {
+        setPlaylists([]);
+        setNeedsConnection(true);
+        return;
+    }
+    
+    // Reset connection state if switching providers
+    setNeedsConnection(false);
     fetchPlaylists();
   }, [provider]);
 
+  const handleConnect = () => {
+      const width = 500;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const url = provider === 'spotify' ? authApi.spotifyLoginUrl() : authApi.youtubeLoginUrl();
+      
+      const popup = window.open(
+          url,
+          "MatchMyTunesLogin",
+          `width=${width},height=${height},top=${top},left=${left}`
+      );
+
+      const checkPopup = setInterval(() => {
+          if (popup.closed) {
+              clearInterval(checkPopup);
+              // Check if connected successfully
+              const isConnected = provider === 'spotify' 
+                ? sessionStorage.getItem('spotify_connected') === 'true'
+                : sessionStorage.getItem('youtube_connected') === 'true';
+                
+              if (isConnected) {
+                  setNeedsConnection(false);
+                  fetchPlaylists();
+                  toast.success(`Connected to ${provider}`);
+              }
+          }
+      }, 1000);
+  };
+
   const fetchPlaylists = async () => {
     setLoading(true);
-    setPlaylists([]); // Clear previous list while loading
+    setPlaylists([]); 
+    setNeedsConnection(false);
+
     try {
       let data;
-      console.log(`Fetching ${provider} playlists...`); // Debug log
-
       if (provider === 'spotify') {
         data = await playlistApi.getSpotifyPlaylists();
       } else {
         data = await playlistApi.getYouTubePlaylists();
       }
       
-      console.log("API Response:", data); // Check console to see exact API structure
+      const collection = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.playlists)
+          ? data.playlists
+          : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.data)
+          ? data.data
+          : [];
 
-      // Robust Data Normalization
-      // Handles: [ ... ], { items: [...] }, { playlists: [...] }, or { data: [...] }
-      let list = [];
-      if (Array.isArray(data)) {
-          list = data;
-      } else if (Array.isArray(data?.items)) {
-          list = data.items;
-      } else if (Array.isArray(data?.playlists)) {
-          list = data.playlists;
-      } else if (Array.isArray(data?.data)) {
-          list = data.data;
-      }
-
-      const normalized = list.map(p => ({
+      const normalized = collection.map(p => ({
           id: p.id || p.playlistId || p.youtubeId,
           name: p.name || p.title || p.snippet?.title || 'Untitled',
+          image: p.images?.[0]?.url || p.thumbnail || p.snippet?.thumbnails?.default?.url || null,
           trackCount: p.tracks?.total || p.trackCount || p.contentDetails?.itemCount || 0,
-          image: p.images?.[0]?.url || p.thumbnail || p.snippet?.thumbnails?.default?.url || null
+          type: p.type || 'playlist'
       })).filter(p => p.id);
 
       setPlaylists(normalized);
       
     } catch (error) {
       console.error("Backup Fetch Error:", error);
-      // Show specific error from backend if available
-      const msg = error?.response?.data?.message || error?.message || `Failed to fetch ${provider}`;
-      toast.error(msg);
+      
+      // If 401/403, it means the token is invalid or scopes are missing
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+          setNeedsConnection(true);
+          toast.error(`Please connect ${provider} to continue.`);
+      } else {
+          const msg = error?.response?.data?.message || error?.message || `Failed to fetch ${provider} playlists`;
+          toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -111,11 +155,12 @@ const BackupSelect = () => {
         </div>
 
         {/* Global Option */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-6 flex items-center gap-4 hover:bg-white/10 transition cursor-pointer" onClick={() => setSelectAll(!selectAll)}>
+        <div className={`bg-white/5 border border-white/10 rounded-xl p-5 mb-6 flex items-center gap-4 transition ${needsConnection ? 'opacity-50 pointer-events-none' : 'hover:bg-white/10 cursor-pointer'}`} onClick={() => !needsConnection && setSelectAll(!selectAll)}>
             <input 
                 type="checkbox" 
                 checked={selectAll}
                 onChange={() => setSelectAll(!selectAll)}
+                disabled={needsConnection}
                 className="w-5 h-5 rounded border-gray-500 text-purple-500 focus:ring-purple-500 cursor-pointer"
             />
             <div>
@@ -125,15 +170,28 @@ const BackupSelect = () => {
         </div>
 
         {/* Playlist List */}
-        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden min-h-[300px]">
             <div className="p-4 border-b border-white/10 bg-black/20">
                 <h3 className="font-semibold">Select a single playlist</h3>
             </div>
             
-            {loading ? (
-                <div className="p-8 text-center text-gray-400">Loading playlists...</div>
+            {needsConnection ? (
+                <div className="p-12 text-center flex flex-col items-center">
+                    <p className="text-gray-300 mb-4">Connect your {provider} account to view playlists.</p>
+                    <button 
+                        onClick={handleConnect}
+                        className="px-6 py-2 bg-white text-black font-bold rounded-full hover:bg-gray-200 transition"
+                    >
+                        Connect {provider.charAt(0).toUpperCase() + provider.slice(1)}
+                    </button>
+                </div>
+            ) : loading ? (
+                <div className="p-12 text-center text-gray-400 flex flex-col items-center">
+                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    Loading playlists...
+                </div>
             ) : playlists.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">No playlists found.</div>
+                <div className="p-12 text-center text-gray-400">No playlists found.</div>
             ) : (
                 <div className="max-h-[500px] overflow-y-auto divide-y divide-white/5">
                     {playlists.map(playlist => (
@@ -174,9 +232,9 @@ const BackupSelect = () => {
         <div className="mt-8 flex justify-end">
             <button 
                 onClick={handleNext}
-                disabled={loading || (!selectAll && !selectedPlaylistId)}
+                disabled={loading || needsConnection || (!selectAll && !selectedPlaylistId)}
                 className={`px-8 py-3 rounded-full font-bold transition ${
-                    loading || (!selectAll && !selectedPlaylistId)
+                    loading || needsConnection || (!selectAll && !selectedPlaylistId)
                     ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-green-500 hover:bg-green-600 text-black shadow-lg shadow-green-500/20'
                 }`}
