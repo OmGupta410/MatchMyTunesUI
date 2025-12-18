@@ -32,7 +32,6 @@ const Layout = () => {
 
   const quickActionItems = [
     { label: "Transfer New", action: "transfer" },
-    { label: "Share", action: "share" },
     { label: "Backup", action: "backup" },
     { label: "Plans (Subscription)", action: "plans" },
   ];
@@ -61,7 +60,7 @@ const Layout = () => {
   const handleQuickAction = (action) => {
     switch (action) {
       case "transfer":
-        navigate("/transfer/setup");
+        navigate("/");
         break;
       case "share":
         navigate("/about?focus=share");
